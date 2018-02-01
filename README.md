@@ -1,7 +1,7 @@
 # Metanalysis-SRB
 
-[![Build Status](https://travis-ci.org/andreihh/metanalysis.svg)](https://travis-ci.org/andreihh/metanalysis-srb)
-[![codecov](https://codecov.io/gh/andreihh/metanalysis/branch/master/graph/badge.svg)](https://codecov.io/gh/andreihh/metanalysis-srb)
+[![Build Status](https://travis-ci.org/andreihh/metanalysis-srb.svg)](https://travis-ci.org/andreihh/metanalysis-srb)
+[![codecov](https://codecov.io/gh/andreihh/metanalysis-srb/branch/master/graph/badge.svg)](https://codecov.io/gh/andreihh/metanalysis-srb)
 [![License](http://img.shields.io/:license-apache-blue.svg)](http://www.apache.org/licenses/LICENSE-2.0.html)
 
 ## Features
