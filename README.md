@@ -6,7 +6,8 @@
 
 ## Features
 
-- an Open-Closed Breaker analysis based on the `metanalysis` code metadata model
+- a Single Responsibility Breaker analysis based on the `metanalysis` code
+metadata model
 
 ## Using Metanalysis-SRB
 

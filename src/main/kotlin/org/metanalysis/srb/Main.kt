@@ -21,7 +21,9 @@ import org.metanalysis.core.model.SourceNode.Companion.ENTITY_SEPARATOR
 import org.metanalysis.core.repository.PersistentRepository
 
 fun main(args: Array<String>) {
-    val repository = PersistentRepository.load() ?: return
+    val repository = PersistentRepository.load()
+        ?: error("Repository not found!")
+
     val changes = hashMapOf<String, Int>()
     val jointChanges = hashMapOf<String, HashMap<Pair<String, String>, Int>>()
 
@@ -46,12 +48,27 @@ fun main(args: Array<String>) {
         }
     }
 
-    for ((path, edges) in jointChanges) {
-        println(path)
+    if (args.size == 1) {
+        val path = args[0]
+        val edges = jointChanges[path] ?: return
+        println("strict graph \"$path\" {")
         for ((edge, cost) in edges) {
             val (id1, id2) = edge
+            val simpleId1 = id1.removePrefix(path)
+            val simpleId2 = id2.removePrefix(path)
             val weight = 1F * cost / maxOf(changes[id1] ?: 0, changes[id2] ?: 0)
-            println("- ($id1, $id2): $weight")
+            println("  \"$simpleId1\" -- \"$simpleId2\" [len=5 weight=$weight];")
+        }
+        println("}")
+    } else {
+        for ((path, edges) in jointChanges) {
+            println(path)
+            for ((edge, cost) in edges) {
+                val (id1, id2) = edge
+                val weight = 1F * cost / maxOf(changes[id1] ?: 0, changes[id2]
+                    ?: 0)
+                println("- ($id1, $id2): $weight")
+            }
         }
     }
 }
