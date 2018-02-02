@@ -16,59 +16,32 @@
 
 package org.metanalysis.srb
 
-import org.metanalysis.core.model.ProjectEdit
-import org.metanalysis.core.model.SourceNode.Companion.ENTITY_SEPARATOR
 import org.metanalysis.core.repository.PersistentRepository
+
+fun printGraph(label: String, graph: Graph) {
+    println("strict graph \"$label\" {")
+    for (node in graph.nodes) {
+        val simpleNode = node.removePrefix(label)
+        println("  \"$node\" [label=\"$simpleNode\"];")
+    }
+    for ((u, v, w) in graph.edges) {
+        println("  \"$u\" -- \"$v\" [len=5 weight=$w];")
+    }
+    println("}")
+}
 
 fun main(args: Array<String>) {
     val repository = PersistentRepository.load()
         ?: error("Repository not found!")
-
-    val changes = hashMapOf<String, Int>()
-    val jointChanges = hashMapOf<String, HashMap<Pair<String, String>, Int>>()
-
-    for (transaction in repository.getHistory()) {
-        val editedIds = transaction.edits.map(ProjectEdit::id)
-        val editedIdsBySource =
-            editedIds.groupBy { it.substringBefore(ENTITY_SEPARATOR) }
-
-        for (id in editedIds) {
-            changes[id] = (changes[id] ?: 0) + 1
-        }
-
-        for ((path, ids) in editedIdsBySource) {
-            val pairChanges = jointChanges[path] ?: hashMapOf()
-            for (id1 in ids) {
-                for (id2 in ids) {
-                    if (id1 >= id2) continue
-                    pairChanges[id1 to id2] = (pairChanges[id1 to id2] ?: 0) + 1
-                }
-            }
-            jointChanges[path] = pairChanges
-        }
-    }
+    val graphs = HistoryVisitor.visit(repository.getHistory())
 
     if (args.size == 1) {
         val path = args[0]
-        val edges = jointChanges[path] ?: return
-        println("strict graph \"$path\" {")
-        for ((edge, cost) in edges) {
-            val (id1, id2) = edge
-            val simpleId1 = id1.removePrefix(path)
-            val simpleId2 = id2.removePrefix(path)
-            val weight = 1F * cost / maxOf(changes[id1] ?: 0, changes[id2] ?: 0)
-            println("  \"$simpleId1\" -- \"$simpleId2\" [len=5 weight=$weight];")
-        }
-        println("}")
+        val graph = graphs[path] ?: error("Invalid source path!")
+        printGraph(path, graph)
     } else {
-        for ((path, edges) in jointChanges) {
-            println(path)
-            for ((edge, cost) in edges) {
-                val (id1, id2) = edge
-                val weight = 1F * cost / maxOf(changes[id1] ?: 0, changes[id2]
-                    ?: 0)
-                println("- ($id1, $id2): $weight")
-            }
+        for ((path, graph) in graphs) {
+            printGraph(path, graph)
         }
     }
 }
