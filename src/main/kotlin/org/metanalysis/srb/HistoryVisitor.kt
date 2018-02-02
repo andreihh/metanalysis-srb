@@ -114,13 +114,12 @@ class HistoryVisitor private constructor() {
             val changesById = changesByParent.getValue(parent)
             val nodes = changesById.keys
             val edges = hashSetOf<Graph.Edge>()
-            for ((pair, jointChanges) in changesByPair) {
+            for ((pair, jointCount) in changesByPair) {
                 val (id1, id2) = pair
-                val changesId1 = changesById.getValue(id1)
-                val changesId2 = changesById.getValue(id2)
-                val totalChanges = changesId1 + changesId2 - jointChanges
-                val cost =
-                    1.0 * jointChanges / totalChanges * sqrt(1.0 * totalChanges)
+                val countId1 = changesById.getValue(id1)
+                val countId2 = changesById.getValue(id2)
+                val totalCount = countId1 + countId2 - jointCount
+                val cost = sqrt(1.0 * totalCount) * jointCount / totalCount
                 val weight = 1.0 / (cost + 1)
                 edges += Graph.Edge(id1, id2, weight)
             }
