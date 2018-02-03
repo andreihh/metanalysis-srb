@@ -22,6 +22,7 @@ import org.junit.Test
 import org.metanalysis.core.repository.PersistentRepository
 import org.metanalysis.core.repository.PersistentRepository.Companion.persist
 import org.metanalysis.test.core.repository.repository
+import java.io.File
 
 class MainTest {
     @Before fun setUpRepository() {
@@ -59,5 +60,6 @@ class MainTest {
 
     @After fun cleanUpRepository() {
         PersistentRepository.clean()
+        File(".metanalysis-srb").deleteRecursively()
     }
 }
