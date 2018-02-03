@@ -27,7 +27,6 @@ import org.metanalysis.core.model.SourceNode
 import org.metanalysis.core.model.parentId
 import org.metanalysis.core.model.walkSourceTree
 import org.metanalysis.core.repository.Transaction
-import kotlin.math.exp
 import kotlin.math.sqrt
 
 class HistoryVisitor private constructor() {
@@ -120,9 +119,9 @@ class HistoryVisitor private constructor() {
                 val countId1 = changesById.getValue(id1)
                 val countId2 = changesById.getValue(id2)
                 val totalCount = countId1 + countId2 - jointCount
-                val cost = sqrt(1.0 * totalCount) * jointCount / totalCount
-                val weight = exp(cost)
-                edges += Graph.Edge(id1, id2, weight)
+                val length = 1.0 * totalCount / jointCount
+                val weight = sqrt(1.0 * jointCount) / length
+                edges += Graph.Edge(id1, id2, length, weight)
             }
             graphs[parent] = Graph(nodes, edges)
         }

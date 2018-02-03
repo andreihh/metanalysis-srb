@@ -22,41 +22,50 @@ import org.metanalysis.core.repository.PersistentRepository
 import java.io.File
 import java.io.PrintStream
 
+private const val EPS = 1e-4
+
 fun printGraph(
     label: String,
     graph: Graph,
     out: PrintStream,
-    scale: Boolean,
-    length: Int
+    thresholdPercent: Int = 0
 ) {
+    require(thresholdPercent in 0..100) { "Invalid threshold percent!" }
+
     out.println("strict graph {")
     out.println("  graph [label=\"$label\"];")
     out.println("  node [shape=box];")
-    out.println("  edge [len=$length];")
-    if (scale) {
-        out.println("  overlap=scale;")
-    }
+
     for (node in graph.nodes) {
         val simpleNode = node.removePrefix("$label$ENTITY_SEPARATOR")
         out.println("  \"$node\" [label=\"$simpleNode\"];")
     }
-    for ((u, v, w) in graph.edges) {
-        out.println("  \"$u\" -- \"$v\" [weight=%.5f];".format(w))
+
+    val edges = graph.edges.sortedByDescending(Graph.Edge::length)
+    val threshold =
+        if (thresholdPercent == 0 || edges.isEmpty()) 1.0 * Int.MAX_VALUE
+        else edges[(thresholdPercent - 1) * edges.size / 100].length
+
+    for ((u, v, l, w) in edges.dropWhile { threshold - it.length < EPS }) {
+        out.println("  \"$u\" -- \"$v\" [len=%.4f, weight=%.4f];".format(l, w))
     }
+
     out.println("}")
 }
 
-fun main(args: Array<String>) {
-    val scale = "--scale" in args
-    val length = args
-        .find { it.startsWith(prefix = "--length=") }
-        ?.removePrefix("--length=")
-        ?.toInt()
-        ?: if (scale) 1 else 5
+private fun loadRepository() =
+    PersistentRepository.load() ?: error("Repository not found!")
 
-    val repository = PersistentRepository.load()
-        ?: error("Repository not found!")
+fun main(args: Array<String>) {
+    val thresholdPercent = args
+        .singleOrNull { it.startsWith("--threshold-percent=") }
+        ?.removePrefix("--threshold-percent=")
+        ?.toInt()
+        ?: 0
+
+    val repository = loadRepository()
     val graphs = HistoryVisitor.visit(repository.getHistory())
+
     val directory = File(".metanalysis-srb")
     directory.mkdir()
     for ((path, graph) in graphs) {
@@ -64,7 +73,7 @@ fun main(args: Array<String>) {
             .replace(oldChar = PATH_SEPARATOR, newChar = '_')
             .replace(oldChar = ENTITY_SEPARATOR, newChar = '_')
         PrintStream(File(directory, file)).use { out ->
-            printGraph(path, graph, out, scale, length)
+            printGraph(path, graph, out, thresholdPercent)
         }
     }
 }
