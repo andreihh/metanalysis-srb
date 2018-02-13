@@ -24,6 +24,7 @@ import org.metanalysis.core.model.Project
 import org.metanalysis.core.model.RemoveNode
 import org.metanalysis.core.model.SourceEntity
 import org.metanalysis.core.model.SourceNode
+import org.metanalysis.core.model.SourceNode.Companion.ENTITY_SEPARATOR
 import org.metanalysis.core.model.parentId
 import org.metanalysis.core.model.walkSourceTree
 import org.metanalysis.core.repository.Transaction
@@ -111,9 +112,15 @@ class HistoryVisitor private constructor() {
     private fun aggregate(): Map<String, Graph> {
         val graphs = hashMapOf<String, Graph>()
         for ((parent, changesByPair) in jointChangesByParent) {
+            fun String.simpleId(): String =
+                removePrefix("$parent$ENTITY_SEPARATOR")
+
             val changesById = changesByParent.getValue(parent)
+            val group = 1
             val nodes = changesById.keys
-            val edges = hashSetOf<Graph.Edge>()
+                .map { Graph.Node(it.simpleId(), group) }
+                .toSet()
+            val links = hashSetOf<Graph.Link>()
             for ((pair, jointCount) in changesByPair) {
                 val (id1, id2) = pair
                 val countId1 = changesById.getValue(id1)
@@ -121,9 +128,9 @@ class HistoryVisitor private constructor() {
                 val totalCount = countId1 + countId2 - jointCount
                 val length = 1.0 * totalCount / jointCount
                 val weight = sqrt(1.0 * jointCount) / length
-                edges += Graph.Edge(id1, id2, length, weight)
+                links += Graph.Link(id1.simpleId(), id2.simpleId(), weight)
             }
-            graphs[parent] = Graph(nodes, edges)
+            graphs[parent] = Graph(nodes, links)
         }
         return graphs
     }

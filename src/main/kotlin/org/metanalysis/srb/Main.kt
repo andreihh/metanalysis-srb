@@ -19,38 +19,23 @@ package org.metanalysis.srb
 import org.metanalysis.core.model.SourceNode.Companion.ENTITY_SEPARATOR
 import org.metanalysis.core.model.SourceNode.Companion.PATH_SEPARATOR
 import org.metanalysis.core.repository.PersistentRepository
+import org.metanalysis.core.serialization.JsonModule
 import java.io.File
-import java.io.PrintStream
+import java.io.OutputStream
 
 private const val EPS = 1e-4
 
-fun printGraph(
-    label: String,
-    graph: Graph,
-    out: PrintStream,
-    thresholdPercent: Int = 0
-) {
+fun printGraph(graph: Graph, out: OutputStream, thresholdPercent: Int = 0) {
     require(thresholdPercent in 0..100) { "Invalid threshold percent!" }
 
-    out.println("strict graph {")
-    out.println("  graph [label=\"$label\"];")
-    out.println("  node [shape=box];")
-
-    for (node in graph.nodes) {
-        val simpleNode = node.removePrefix("$label$ENTITY_SEPARATOR")
-        out.println("  \"$node\" [label=\"$simpleNode\"];")
-    }
-
-    val edges = graph.edges.sortedByDescending(Graph.Edge::length)
+    val links = graph.links.sortedByDescending(Graph.Link::value)
     val threshold =
-        if (thresholdPercent == 0 || edges.isEmpty()) 1.0 * Int.MAX_VALUE
-        else edges[(thresholdPercent - 1) * edges.size / 100].length
+        if (thresholdPercent == 0 || links.isEmpty()) 1.0 * Int.MAX_VALUE
+        else links[(thresholdPercent - 1) * links.size / 100].value
+    val newLinks = links.dropWhile { threshold - it.value < EPS }.toSet()
+    val newGraph = graph.copy(links = newLinks)
 
-    for ((u, v, l, w) in edges.dropWhile { threshold - it.length < EPS }) {
-        out.println("  \"$u\" -- \"$v\" [len=%.4f, weight=%.4f];".format(l, w))
-    }
-
-    out.println("}")
+    JsonModule.serialize(out, newGraph)
 }
 
 private fun loadRepository() =
@@ -69,11 +54,11 @@ fun main(args: Array<String>) {
     val directory = File(".metanalysis-srb")
     directory.mkdir()
     for ((path, graph) in graphs) {
-        val file = "$path.gv"
+        val file = "$path.json"
             .replace(oldChar = PATH_SEPARATOR, newChar = '_')
             .replace(oldChar = ENTITY_SEPARATOR, newChar = '_')
-        PrintStream(File(directory, file)).use { out ->
-            printGraph(path, graph, out, thresholdPercent)
+        File(directory, file).outputStream().use { out ->
+            printGraph(graph, out, thresholdPercent)
         }
     }
 }

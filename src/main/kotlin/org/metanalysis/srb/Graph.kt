@@ -16,11 +16,12 @@
 
 package org.metanalysis.srb
 
-data class Graph(val nodes: Set<String>, val edges: Set<Edge>) {
-    data class Edge(
-        val u: String,
-        val v: String,
-        val length: Double,
-        val weight: Double
+data class Graph(val nodes: Set<Node>, val links: Set<Link>) {
+    data class Node(val id: String, val group: Int)
+
+    data class Link(
+        val source: String,
+        val target: String,
+        val value: Double
     )
 }
