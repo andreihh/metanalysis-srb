@@ -115,14 +115,13 @@ class HistoryVisitor private constructor() {
     private fun aggregate(publicOnly: Boolean): Map<String, Graph> {
         val graphs = hashMapOf<String, Graph>()
         for ((parent, changesByPair) in jointChangesByParent) {
-            fun String.simpleId(): String =
+            fun String.label(): String =
                 removePrefix("$parent$ENTITY_SEPARATOR")
 
             val changesById = changesByParent.getValue(parent)
-            val group = 1
             val nodes = changesById.keys
                 .filter { !publicOnly || isPublic(it) }
-                .map { Graph.Node(it.simpleId(), group) }
+                .map { Graph.Node(it.label()) }
                 .toSet()
             val links = hashSetOf<Graph.Link>()
             for ((pair, jointCount) in changesByPair) {
@@ -133,9 +132,9 @@ class HistoryVisitor private constructor() {
                 val totalCount = countId1 + countId2 - jointCount
                 val length = 1.0 * totalCount / jointCount
                 val weight = sqrt(1.0 * jointCount) / length
-                links += Graph.Link(id1.simpleId(), id2.simpleId(), weight)
+                links += Graph.Link(id1.label(), id2.label(), weight)
             }
-            graphs[parent] = Graph(nodes, links)
+            graphs[parent] = Graph(nodes, links).groupByComponents(1.0) // TODO
         }
         return graphs
     }

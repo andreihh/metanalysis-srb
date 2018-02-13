@@ -17,7 +17,11 @@
 package org.metanalysis.srb
 
 data class Graph(val nodes: Set<Node>, val links: Set<Link>) {
-    data class Node(val id: String, val group: Int)
+    data class Node(val id: String, val group: Int = 1)
 
     data class Link(val source: String, val target: String, val value: Double)
+
+    fun groupByComponents(threshold: Double): Graph {
+        return this // TODO
+    }
 }
