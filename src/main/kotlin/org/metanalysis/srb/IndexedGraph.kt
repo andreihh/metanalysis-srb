@@ -16,8 +16,8 @@
 
 package org.metanalysis.srb
 
-data class Graph(val nodes: Set<Node>, val links: Set<Link>) {
-    data class Node(val id: String, val group: Int)
+data class IndexedGraph(val nodes: List<Node>, val links: Set<Link>) {
+    data class Node(val name: String, val group: Int)
 
-    data class Link(val source: String, val target: String, val value: Double)
+    data class Link(val source: Int, val target: Int, val value: Double)
 }

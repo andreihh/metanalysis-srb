@@ -25,7 +25,24 @@ import java.io.OutputStream
 
 private const val EPS = 1e-4
 
-fun printGraph(graph: Graph, out: OutputStream, thresholdPercent: Int = 0) {
+fun Graph.toIndexed(): IndexedGraph {
+    val nodeIndex = hashMapOf<String, Int>()
+    for ((index, node) in nodes.withIndex()) {
+        nodeIndex[node.id] = index
+    }
+    val newNodes = nodes.map { (id, group) -> IndexedGraph.Node(id, group) }
+    val newLinks = links.map { (s, t, v) ->
+        IndexedGraph.Link(nodeIndex.getValue(s), nodeIndex.getValue(t), v)
+    }
+    return IndexedGraph(newNodes, newLinks.toSet())
+}
+
+fun printGraph(
+    graph: Graph,
+    out: OutputStream,
+    thresholdPercent: Int = 0,
+    indexed: Boolean = false
+) {
     require(thresholdPercent in 0..100) { "Invalid threshold percent!" }
 
     val links = graph.links.sortedByDescending(Graph.Link::value)
@@ -35,13 +52,15 @@ fun printGraph(graph: Graph, out: OutputStream, thresholdPercent: Int = 0) {
     val newLinks = links.dropWhile { threshold - it.value < EPS }.toSet()
     val newGraph = graph.copy(links = newLinks)
 
-    JsonModule.serialize(out, newGraph)
+    JsonModule.serialize(out, if (indexed) newGraph.toIndexed() else newGraph)
 }
 
 private fun loadRepository() =
     PersistentRepository.load() ?: error("Repository not found!")
 
 fun main(args: Array<String>) {
+    val indexed = "--indexed" in args
+    val publicOnly = "--public-only" in args
     val thresholdPercent = args
         .singleOrNull { it.startsWith("--threshold-percent=") }
         ?.removePrefix("--threshold-percent=")
@@ -49,7 +68,7 @@ fun main(args: Array<String>) {
         ?: 0
 
     val repository = loadRepository()
-    val graphs = HistoryVisitor.visit(repository.getHistory())
+    val graphs = HistoryVisitor.visit(repository.getHistory(), publicOnly)
 
     val directory = File(".metanalysis-srb")
     directory.mkdir()
@@ -58,7 +77,7 @@ fun main(args: Array<String>) {
             .replace(oldChar = PATH_SEPARATOR, newChar = '_')
             .replace(oldChar = ENTITY_SEPARATOR, newChar = '_')
         File(directory, file).outputStream().use { out ->
-            printGraph(graph, out, thresholdPercent)
+            printGraph(graph, out, thresholdPercent, indexed)
         }
     }
 }

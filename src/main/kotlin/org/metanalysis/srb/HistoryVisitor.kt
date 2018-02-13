@@ -109,7 +109,10 @@ class HistoryVisitor private constructor() {
         }
     }
 
-    private fun aggregate(): Map<String, Graph> {
+    private fun isPublic(id: String): Boolean =
+        project.get<Function?>(id)?.modifiers?.contains("public") == true
+
+    private fun aggregate(publicOnly: Boolean): Map<String, Graph> {
         val graphs = hashMapOf<String, Graph>()
         for ((parent, changesByPair) in jointChangesByParent) {
             fun String.simpleId(): String =
@@ -118,11 +121,13 @@ class HistoryVisitor private constructor() {
             val changesById = changesByParent.getValue(parent)
             val group = 1
             val nodes = changesById.keys
+                .filter { !publicOnly || isPublic(it) }
                 .map { Graph.Node(it.simpleId(), group) }
                 .toSet()
             val links = hashSetOf<Graph.Link>()
             for ((pair, jointCount) in changesByPair) {
                 val (id1, id2) = pair
+                if (publicOnly && (!isPublic(id1) || !isPublic(id2))) continue
                 val countId1 = changesById.getValue(id1)
                 val countId2 = changesById.getValue(id2)
                 val totalCount = countId1 + countId2 - jointCount
@@ -136,12 +141,15 @@ class HistoryVisitor private constructor() {
     }
 
     companion object {
-        fun visit(history: Iterable<Transaction>): Map<String, Graph> {
+        fun visit(
+            history: Iterable<Transaction>,
+            publicOnly: Boolean = false
+        ): Map<String, Graph> {
             val visitor = HistoryVisitor()
             for (transaction in history) {
                 visitor.analyze(transaction)
             }
-            return visitor.aggregate()
+            return visitor.aggregate(publicOnly)
         }
     }
 }
