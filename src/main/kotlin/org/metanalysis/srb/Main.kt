@@ -59,7 +59,7 @@ fun main(args: Array<String>) {
             .replace(oldChar = PATH_SEPARATOR, newChar = '_')
             .replace(oldChar = ENTITY_SEPARATOR, newChar = '_')
         File(directory, file).outputStream().use { out ->
-            printGraph(graph, out, thresholdPercent)
+            printGraph(graph.colorNodesByComponent(), out, thresholdPercent)
         }
     }
 }

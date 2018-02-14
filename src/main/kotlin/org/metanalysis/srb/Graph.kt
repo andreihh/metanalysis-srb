@@ -30,4 +30,48 @@ data class Graph(
         val length: Double,
         val weight: Double
     )
+
+    private class DisjointSets {
+        private val parent = hashMapOf<String, String>()
+
+        operator fun get(x: String): String {
+            var root = x
+            while (root in parent) {
+                root = parent.getValue(root)
+            }
+            return root
+        }
+
+        fun merge(x: String, y: String): Boolean {
+            val rootX = get(x)
+            val rootY = get(y)
+            if (rootX != rootY) {
+                parent[rootX] = rootY
+            }
+            return rootX != rootY
+        }
+    }
+
+    fun colorNodesByComponent(): Graph {
+        val sets = DisjointSets()
+        for (edge in edges.sortedByDescending(Edge::weight)) {
+            sets.merge(edge.source, edge.target)
+        }
+
+        val newColors = hashMapOf<String, Int>()
+        var count = 0
+        for ((label, _) in nodes) {
+            val root = sets[label]
+            if (root !in newColors) {
+                newColors[root] = count++
+            }
+            newColors[label] = newColors.getValue(root)
+        }
+
+        val newNodes = nodes.map { (label, _) ->
+            Node(label, newColors.getValue(label))
+        }.toSet()
+
+        return Graph(label, newNodes, edges)
+    }
 }
