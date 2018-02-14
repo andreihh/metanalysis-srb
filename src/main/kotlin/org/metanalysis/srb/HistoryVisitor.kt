@@ -123,7 +123,7 @@ class HistoryVisitor private constructor() {
                 .filter { !publicOnly || isPublic(it) }
                 .map { Graph.Node(it.label()) }
                 .toSet()
-            val links = hashSetOf<Graph.Link>()
+            val edges = hashSetOf<Graph.Edge>()
             for ((pair, jointCount) in changesByPair) {
                 val (id1, id2) = pair
                 if (publicOnly && (!isPublic(id1) || !isPublic(id2))) continue
@@ -132,9 +132,9 @@ class HistoryVisitor private constructor() {
                 val totalCount = countId1 + countId2 - jointCount
                 val length = 1.0 * totalCount / jointCount
                 val weight = sqrt(1.0 * jointCount) / length
-                links += Graph.Link(id1.label(), id2.label(), weight)
+                edges += Graph.Edge(id1.label(), id2.label(), length, weight)
             }
-            graphs[parent] = Graph(nodes, links).groupByComponents(1.0) // TODO
+            graphs[parent] = Graph(parent, nodes, edges)
         }
         return graphs
     }
