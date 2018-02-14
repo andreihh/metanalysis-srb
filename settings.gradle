@@ -1,2 +1,5 @@
 rootProject.name = 'metanalysis-srb'
 
+include 'metanalysis-srb-core'
+include 'metanalysis-srb-java'
+

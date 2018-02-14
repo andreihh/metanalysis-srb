@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.metanalysis.srb
+package org.metanalysis.srb.core
 
 import org.metanalysis.core.model.AddNode
 import org.metanalysis.core.model.EditFunction
@@ -28,6 +28,8 @@ import org.metanalysis.core.model.SourceNode.Companion.ENTITY_SEPARATOR
 import org.metanalysis.core.model.parentId
 import org.metanalysis.core.model.walkSourceTree
 import org.metanalysis.core.repository.Transaction
+import org.metanalysis.srb.core.Graph.Edge
+import org.metanalysis.srb.core.Graph.Node
 import kotlin.math.sqrt
 
 class HistoryVisitor private constructor() {
@@ -110,7 +112,7 @@ class HistoryVisitor private constructor() {
     }
 
     private fun isPublic(id: String): Boolean =
-        project.get<Function?>(id)?.modifiers?.contains("public") == true
+        VisibilityAnalyzer.isPublic(project, id)
 
     private fun aggregate(publicOnly: Boolean): Map<String, Graph> {
         val graphs = hashMapOf<String, Graph>()
@@ -121,9 +123,9 @@ class HistoryVisitor private constructor() {
             val changesById = changesByParent.getValue(parent)
             val nodes = changesById.keys
                 .filter { !publicOnly || isPublic(it) }
-                .map { Graph.Node(it.label()) }
+                .map { Node(it.label()) }
                 .toSet()
-            val edges = hashSetOf<Graph.Edge>()
+            val edges = hashSetOf<Edge>()
             for ((pair, jointCount) in changesByPair) {
                 val (id1, id2) = pair
                 if (publicOnly && (!isPublic(id1) || !isPublic(id2))) continue
@@ -132,7 +134,7 @@ class HistoryVisitor private constructor() {
                 val totalCount = countId1 + countId2 - jointCount
                 val length = 1.0 * totalCount / jointCount
                 val weight = sqrt(1.0 * jointCount) / length
-                edges += Graph.Edge(id1.label(), id2.label(), length, weight)
+                edges += Edge(id1.label(), id2.label(), length, weight)
             }
             graphs[parent] = Graph(parent, nodes, edges)
         }

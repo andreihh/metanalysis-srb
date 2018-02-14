@@ -20,6 +20,8 @@ import org.metanalysis.core.model.SourceNode.Companion.ENTITY_SEPARATOR
 import org.metanalysis.core.model.SourceNode.Companion.PATH_SEPARATOR
 import org.metanalysis.core.repository.PersistentRepository
 import org.metanalysis.core.serialization.JsonModule
+import org.metanalysis.srb.core.Graph
+import org.metanalysis.srb.core.HistoryVisitor
 import java.io.File
 import java.io.OutputStream
 

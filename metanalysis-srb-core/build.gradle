@@ -1,0 +1,5 @@
+dependencies {
+    api "com.github.andreihh.metanalysis:metanalysis-core:$metanalysis_version"
+
+    testImplementation "com.github.andreihh.metanalysis:metanalysis-test:$metanalysis_version"
+}

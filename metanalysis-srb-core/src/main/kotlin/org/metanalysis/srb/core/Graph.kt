@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.metanalysis.srb
+package org.metanalysis.srb.core
 
 data class Graph(
     val label: String,

@@ -14,18 +14,13 @@
  * limitations under the License.
  */
 
-package org.metanalysis.srb
+package org.metanalysis.srb.core
 
-import org.junit.After
-import org.junit.Before
 import org.junit.Test
-import org.metanalysis.core.repository.PersistentRepository
-import org.metanalysis.core.repository.PersistentRepository.Companion.persist
 import org.metanalysis.test.core.repository.repository
-import java.io.File
 
-class MainTest {
-    @Before fun setUpRepository() {
+class HistoryVisitorTest {
+    private val repositoryMock =
         repository {
             transaction("0") {
                 addSourceUnit("Main.java") {
@@ -51,15 +46,9 @@ class MainTest {
                 }
                 removeNode("Main.java:Main")
             }
-        }.persist()
-    }
+        }
 
     @Test fun `smoke test`() {
-        main(emptyArray())
-    }
-
-    @After fun cleanUpRepository() {
-        PersistentRepository.clean()
-        File(".metanalysis-srb").deleteRecursively()
+        HistoryVisitor.visit(repositoryMock.getHistory())
     }
 }

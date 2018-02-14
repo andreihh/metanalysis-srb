@@ -1,6 +1,3 @@
-group 'org.metanalysis'
-version '0.1.0'
-
 buildscript {
     ext {
         kotlin_version = '1.2.21'
@@ -18,40 +15,72 @@ buildscript {
     }
 }
 
+allprojects {
+    group 'org.metanalysis'
+    version '0.1.0'
+
+    apply plugin: 'kotlin'
+    apply plugin: 'jacoco'
+
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+
+    tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).all {
+        kotlinOptions.jvmTarget = '1.8'
+    }
+
+    repositories {
+        mavenCentral()
+        maven { url 'https://jitpack.io' }
+    }
+
+    dependencies {
+        implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
+
+        testImplementation "org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version"
+        testImplementation "junit:junit:$junit_version"
+    }
+
+    jar {
+        from rootProject.file('LICENSE')
+        from rootProject.file('NOTICE')
+    }
+
+    jacocoTestReport {
+        dependsOn test
+
+        reports {
+            html.enabled = true
+            xml.enabled = true
+            csv.enabled = false
+        }
+    }
+}
+
+subprojects {
+    apply plugin: 'java-library'
+}
+
 apply plugin: 'application'
-apply plugin: 'kotlin'
-apply plugin: 'jacoco'
 
 mainClassName = 'org.metanalysis.srb.MainKt'
 
-sourceCompatibility = JavaVersion.VERSION_1_8
-targetCompatibility = JavaVersion.VERSION_1_8
-
-tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).all {
-    kotlinOptions.jvmTarget = '1.8'
-}
-
-repositories {
-    mavenCentral()
-    maven { url 'https://jitpack.io' }
-}
-
 dependencies {
-    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
-    compile "com.github.andreihh.metanalysis:metanalysis-core:$metanalysis_version"
-
-    testCompile "org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version"
-    testCompile "com.github.andreihh.metanalysis:metanalysis-test:$metanalysis_version"
-    testCompile "junit:junit:$junit_version"
+    implementation project(':metanalysis-srb-core')
+    runtimeOnly project(':metanalysis-srb-java')
 }
 
-jar {
-    from rootProject.file('LICENSE')
-    from rootProject.file('NOTICE')
-}
+task codeCoverageReport(type: JacocoReport) {
+    dependsOn {
+        allprojects*.jacocoTestReport
+    }
 
-jacocoTestReport {
-    dependsOn test
+    executionData fileTree(project.rootDir.absolutePath)
+            .include("**/build/jacoco/*.exec")
+
+    allprojects.each {
+        sourceSets it.sourceSets.main
+    }
 
     reports {
         html.enabled = true
