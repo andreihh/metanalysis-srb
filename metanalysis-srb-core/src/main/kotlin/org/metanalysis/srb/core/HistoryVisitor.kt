@@ -30,7 +30,7 @@ import org.metanalysis.core.model.walkSourceTree
 import org.metanalysis.core.repository.Transaction
 import org.metanalysis.srb.core.Graph.Edge
 import org.metanalysis.srb.core.Graph.Node
-import kotlin.math.sqrt
+import kotlin.math.log2
 
 class HistoryVisitor private constructor() {
     private val project = Project.empty()
@@ -125,7 +125,7 @@ class HistoryVisitor private constructor() {
                 .filter { !publicOnly || isPublic(it) }
                 .map { Node(it.label()) }
                 .toSet()
-            val edges = hashSetOf<Edge>()
+            val edges = arrayListOf<Edge>()
             for ((pair, jointCount) in changesByPair) {
                 val (id1, id2) = pair
                 if (publicOnly && (!isPublic(id1) || !isPublic(id2))) continue
@@ -133,7 +133,7 @@ class HistoryVisitor private constructor() {
                 val countId2 = changesById.getValue(id2)
                 val totalCount = countId1 + countId2 - jointCount
                 val length = 1.0 * totalCount / jointCount
-                val weight = sqrt(1.0 * jointCount) / length
+                val weight = log2(1.0 * totalCount) / length
                 edges += Edge(id1.label(), id2.label(), length, weight)
             }
             graphs[parent] = Graph(parent, nodes, edges)
