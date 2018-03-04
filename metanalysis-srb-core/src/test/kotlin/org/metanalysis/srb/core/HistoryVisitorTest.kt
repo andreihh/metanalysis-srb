@@ -49,6 +49,13 @@ class HistoryVisitorTest {
         }
 
     @Test fun `smoke test`() {
-        HistoryVisitor.analyze(repositoryMock.getHistory())
+        val options = HistoryVisitor.Options(
+            publicOnly = false,
+            minCoupling = 0.0,
+            minRevisions = 1,
+            minBlobSize = 1,
+            minBlobCoupling = 0.0
+        )
+        HistoryVisitor.analyze(repositoryMock.getHistory(), options)
     }
 }
