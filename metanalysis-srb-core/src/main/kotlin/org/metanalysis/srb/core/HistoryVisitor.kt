@@ -25,14 +25,21 @@ import org.metanalysis.core.model.RemoveNode
 import org.metanalysis.core.model.SourceEntity
 import org.metanalysis.core.model.SourceNode
 import org.metanalysis.core.model.SourceNode.Companion.ENTITY_SEPARATOR
+import org.metanalysis.core.model.SourceUnit
+import org.metanalysis.core.model.Type
 import org.metanalysis.core.model.parentId
 import org.metanalysis.core.model.walkSourceTree
 import org.metanalysis.core.repository.Transaction
 import org.metanalysis.srb.core.Graph.Edge
 import org.metanalysis.srb.core.Graph.Node
-import kotlin.math.log2
 
-class HistoryVisitor private constructor() {
+class HistoryVisitor private constructor(options: Options) {
+    private val publicOnly = options.publicOnly
+    private val minCoupling = options.minCoupling
+    private val minRevisions = options.minRevisions
+    private val minBlobSize = options.minBlobSize
+    private val minBlobDensity = options.minBlobCoupling
+
     private val project = Project.empty()
     private val changesByParent = hashMapOf<String, HashMap<String, Int>>()
     private val jointChangesByParent =
@@ -92,8 +99,8 @@ class HistoryVisitor private constructor() {
     private fun analyze(transaction: Transaction) {
         val editedIdsByParent = visit(transaction)
         for ((parent, editedIds) in editedIdsByParent) {
-            val changes = changesByParent[parent] ?: hashMapOf()
-            val jointChanges = jointChangesByParent[parent] ?: hashMapOf()
+            val changes = changesByParent.getOrPut(parent, ::HashMap)
+            val jointChanges = jointChangesByParent.getOrPut(parent, ::HashMap)
 
             for (id in editedIds) {
                 changes[id] = (changes[id] ?: 0) + 1
@@ -105,16 +112,23 @@ class HistoryVisitor private constructor() {
                     jointChanges[pair] = (jointChanges[pair] ?: 0) + 1
                 }
             }
-
-            changesByParent[parent] = changes
-            jointChangesByParent[parent] = jointChanges
         }
     }
 
     private fun isPublic(id: String): Boolean =
         VisibilityAnalyzer.isPublic(project, id)
 
-    private fun aggregate(publicOnly: Boolean): Map<String, Graph> {
+    private fun takeNode(id: String): Boolean =
+        !publicOnly || isPublic(id)
+
+    private fun takeEdge(edge: Graph.Edge): Boolean {
+        val (id1, id2, coupling, revisions) = edge
+        return (!publicOnly || (isPublic(id1) && isPublic(id2)))
+            && coupling >= minCoupling
+            && revisions >= minRevisions
+    }
+
+    private fun aggregateGraphs(): HashMap<String, Graph> {
         val graphs = hashMapOf<String, Graph>()
         for ((parent, changesByPair) in jointChangesByParent) {
             fun String.label(): String =
@@ -122,35 +136,90 @@ class HistoryVisitor private constructor() {
 
             val changesById = changesByParent.getValue(parent)
             val nodes = changesById.keys
-                .filter { !publicOnly || isPublic(it) }
+                .filter(::takeNode)
                 .map { Node(it.label()) }
                 .toSet()
-            val edges = arrayListOf<Edge>()
-            for ((pair, jointCount) in changesByPair) {
+            val edges = changesByPair.map { (pair, jointCount) ->
                 val (id1, id2) = pair
-                if (publicOnly && (!isPublic(id1) || !isPublic(id2))) continue
                 val countId1 = changesById.getValue(id1)
                 val countId2 = changesById.getValue(id2)
-                val totalCount = countId1 + countId2 - jointCount
-                val length = 1.0 * totalCount / jointCount
-                val weight = log2(1.0 * totalCount) / length
-                edges += Edge(id1.label(), id2.label(), length, weight)
-            }
+                val revisions = countId1 + countId2 - jointCount
+                val coupling = 1.0 * jointCount / revisions
+                Edge(id1.label(), id2.label(), coupling, revisions)
+            }.filter(::takeEdge)
             graphs[parent] = Graph(parent, nodes, edges)
         }
         return graphs
     }
 
-    companion object {
-        fun visit(
-            history: Iterable<Transaction>,
-            publicOnly: Boolean = false
-        ): Map<String, Graph> {
-            val visitor = HistoryVisitor()
-            for (transaction in history) {
-                visitor.analyze(transaction)
+    private fun aggregate(
+        graphs: HashMap<String, Graph>,
+        type: Type
+    ): TypeReport {
+        val types = type.members
+            .filterIsInstance<Type>()
+            .map { aggregate(graphs, it) }
+            .sortedByDescending(TypeReport::value)
+        val graph = graphs[type.id]
+        val components = graph?.findComponents().orEmpty()
+        val blobs = graph?.findBlobs(minBlobSize, minBlobDensity).orEmpty()
+        if (graph != null) {
+            graphs[type.id] = graph.colorNodes(components, blobs)
+        }
+        return TypeReport(type.name, components, blobs, types)
+    }
+
+    private fun aggregate(
+        graphs: HashMap<String, Graph>,
+        unit: SourceUnit
+    ): FileReport {
+        val types = unit.entities
+            .filterIsInstance<Type>()
+            .map { aggregate(graphs, it) }
+            .sortedByDescending(TypeReport::value)
+        val graph = graphs[unit.id]
+        val components = graph?.findComponents().orEmpty()
+        val blobs = graph?.findBlobs(minBlobSize, minBlobDensity).orEmpty()
+        if (graph != null) {
+            graphs[unit.id] = graph.colorNodes(components, blobs)
+        }
+        return FileReport(unit.path, components, blobs, types)
+    }
+
+    private fun aggregate(): Report {
+        val graphs = aggregateGraphs()
+        val files = project.sources
+            .map { aggregate(graphs, it) }
+            .sortedByDescending(FileReport::value)
+        return Report(files, graphs.values.toList())
+    }
+
+    data class Options(
+        val publicOnly: Boolean,
+        val minCoupling: Double,
+        val minRevisions: Int,
+        val minBlobSize: Int,
+        val minBlobCoupling: Double
+    ) {
+
+        init {
+            require(minCoupling >= 0.0) { "Invalid coupling '$minCoupling'!" }
+            require(minRevisions > 0) { "Invalid revisions '$minRevisions'!" }
+            require(minBlobSize > 0) { "Invalid blob size '$minBlobSize'!" }
+            require(minBlobCoupling >= 0.0) {
+                "Invalid blob coupling '$minBlobCoupling'!"
             }
-            return visitor.aggregate(publicOnly)
+        }
+    }
+
+    companion object {
+        fun analyze(
+            history: Iterable<Transaction>,
+            options: Options
+        ): Report {
+            val visitor = HistoryVisitor(options)
+            history.forEach(visitor::analyze)
+            return visitor.aggregate()
         }
     }
 }

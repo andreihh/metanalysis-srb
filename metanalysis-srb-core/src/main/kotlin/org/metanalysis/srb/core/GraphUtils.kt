@@ -16,12 +16,54 @@
 
 package org.metanalysis.srb.core
 
+import org.metanalysis.srb.core.Graph.Subgraph
 import java.util.PriorityQueue
 
-fun Graph.filterEdges(threshold: Double): Graph {
-    require(threshold >= 0.0) { "Invalid threshold '$threshold'!" }
-    val newEdges = edges.filter { (_, _, _, w) -> w >threshold }
-    return copy(edges = newEdges)
+internal const val MAX_GRAPH_SIZE: Int = 300
+
+internal fun Graph.findComponents(): List<Set<String>> {
+    val sets = DisjointSets()
+    for (edge in edges) {
+        sets.merge(edge.source, edge.target)
+    }
+    val components = hashMapOf<String, HashSet<String>>()
+    for (node in nodes) {
+        val root = sets[node.label]
+        components.getOrPut(root, ::hashSetOf) += node.label
+    }
+    return components.values.toList()
+}
+
+internal fun Graph.findBlobs(
+    minSize: Int,
+    minDensity: Double
+): List<Subgraph> {
+    require(minSize > 0) { "Invalid blob size threshold '$minSize'!" }
+    require(minDensity >= 0) { "Invalid blob density threshold '$minDensity'!" }
+    if (nodes.size > MAX_GRAPH_SIZE) return emptyList()
+    val blobs = arrayListOf<Subgraph>()
+    findBlobs(this, minSize, minDensity, blobs)
+    return blobs
+}
+
+internal fun Graph.colorNodes(
+    components: List<Set<String>>,
+    blobs: List<Subgraph>
+): Graph {
+    val newColors = hashMapOf<String, Int>()
+    val colorGroups = components + blobs.map(Subgraph::nodes)
+    var color = 0
+    for (group in colorGroups) {
+        color++
+        for (node in group) {
+            newColors[node] = color
+        }
+    }
+
+    val newNodes = nodes.map { (label, _) ->
+        Graph.Node(label = label, color = newColors[label] ?: 0)
+    }
+    return copy(nodes = newNodes.toSet())
 }
 
 private class DisjointSets {
@@ -45,61 +87,11 @@ private class DisjointSets {
     }
 }
 
-private fun Graph.colorNodesByComponent(): Graph {
-    val sets = DisjointSets()
-    for (edge in edges.sortedByDescending(Graph.Edge::weight)) {
-        sets.merge(edge.source, edge.target)
-    }
-
-    val newColors = hashMapOf<String, Int>()
-    var count = 0
-    for ((label, _) in nodes) {
-        val root = sets[label]
-        if (root !in newColors) {
-            newColors[root] = count++
-        }
-        newColors[label] = newColors.getValue(root)
-    }
-
-    val newNodes = nodes.map { (label, _) ->
-        Graph.Node(label, newColors.getValue(label))
-    }.toSet()
-
-    return copy(nodes = newNodes)
-}
-
-private fun Graph.colorNodesByBlobs(): Graph {
-    val newColors = nodes.associateTo(hashMapOf()) { it.label to it.color }
-
-    val blobs = arrayListOf<Set<String>>()
-    findBlobs(this, 5, 0.25, blobs)
-    var nextColor = nodes.map(Graph.Node::color).max() ?: 0
-    for (blob in blobs) {
-        nextColor++
-        for (node in blob) {
-            newColors[node] = nextColor
-        }
-    }
-    val newNodes = nodes.map { (label, _) ->
-        Graph.Node(label, newColors.getValue(label))
-    }.toSet()
-
-    return copy(nodes = newNodes)
-}
-
-fun Graph.colorNodes(): Graph =
-    //if (nodes.size < 300) colorNodesByComponent().colorNodesByBlobs()
-    //else colorNodesByComponent()
-    if (nodes.size < 300) colorNodesByBlobs() else this
-
 private fun findBlob(
     graph: Graph,
     minSize: Int,
     minDensity: Double
-): Set<String> {
-    require(minSize > 1)
-    require(minDensity > 0.0)
-
+): Subgraph? {
     val degrees = hashMapOf<String, Double>()
     val edges = hashMapOf<String, HashSet<Graph.Edge>>()
     val nodes = graph.nodes.map(Graph.Node::label).toHashSet()
@@ -112,17 +104,17 @@ private fun findBlob(
     }
 
     val heap = PriorityQueue<String>(maxOf(1, nodes.size)) { u, v ->
-        compareValues(degrees[v], degrees[u])
+        compareValues(degrees[u], degrees[v])
     }
     heap += nodes
 
-    var blob = emptySet<String>()
+    var blob: Set<String>? = null
     var blobDensity = 0.0
 
     var degreeSum = degrees.values.sum()
     fun density() = degreeSum / (nodes.size * (nodes.size - 1))
     while (nodes.size >= minSize) {
-        if (blob.isEmpty() || density() > blobDensity) {
+        if (blob == null || density() > blobDensity) {
             blob = nodes.toSet()
             blobDensity = density()
         }
@@ -143,14 +135,8 @@ private fun findBlob(
         edges -= node
     }
 
-    /*if (graph.label.endsWith("") && blobDensity >= minDensity) {
-        println("Found blob with size ${blob.size} and density $blobDensity!")
-        println("Blob nodes: $blob")
-        println("Blob edges:")
-        graph.edges.filter { (u, v, _, _) -> u in blob && v in blob }
-            .forEach(::println)
-    }*/
-    return if (blobDensity >= minDensity) blob else emptySet()
+    return if (blob == null || blobDensity < minDensity) null
+    else Subgraph(blob, blobDensity)
 }
 
 private operator fun Graph.minus(nodes: Set<String>): Graph {
@@ -163,12 +149,12 @@ private tailrec fun findBlobs(
     graph: Graph,
     minSize: Int,
     minDensity: Double,
-    blobs: ArrayList<Set<String>>
+    blobs: ArrayList<Subgraph>
 ) {
     val blob = findBlob(graph, minSize, minDensity)
-    if (blob.isNotEmpty()) {
+    if (blob != null) {
         blobs.add(blob)
-        val remainingGraph = graph - blob
+        val remainingGraph = graph - blob.nodes
         findBlobs(remainingGraph, minSize, minDensity, blobs)
     }
 }

@@ -27,8 +27,9 @@ data class Graph(
     data class Edge(
         val source: String,
         val target: String,
-        val length: Double,
-        val weight: Double
+        val coupling: Double,
+        val revisions: Int
     )
 
+    data class Subgraph(val nodes: Set<String>, val density: Double)
 }

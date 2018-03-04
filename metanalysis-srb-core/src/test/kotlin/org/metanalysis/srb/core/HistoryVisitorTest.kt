@@ -49,6 +49,6 @@ class HistoryVisitorTest {
         }
 
     @Test fun `smoke test`() {
-        HistoryVisitor.visit(repositoryMock.getHistory())
+        HistoryVisitor.analyze(repositoryMock.getHistory())
     }
 }
