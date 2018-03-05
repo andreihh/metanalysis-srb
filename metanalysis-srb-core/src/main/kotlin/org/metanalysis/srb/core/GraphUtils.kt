@@ -16,6 +16,8 @@
 
 package org.metanalysis.srb.core
 
+import org.metanalysis.srb.core.Graph.Edge
+import org.metanalysis.srb.core.Graph.Node
 import org.metanalysis.srb.core.Graph.Subgraph
 import java.util.PriorityQueue
 
@@ -38,7 +40,7 @@ internal fun Graph.findBlobs(
     minSize: Int,
     minDensity: Double
 ): List<Subgraph> {
-    require(minSize > 0) { "Invalid blob size threshold '$minSize'!" }
+    require(minSize > 1) { "Invalid blob size threshold '$minSize'!" }
     require(minDensity >= 0) { "Invalid blob density threshold '$minDensity'!" }
     if (nodes.size > MAX_GRAPH_SIZE) return emptyList()
     val blobs = arrayListOf<Subgraph>()
@@ -93,12 +95,12 @@ private fun findBlob(
     minDensity: Double
 ): Subgraph? {
     val degrees = hashMapOf<String, Double>()
-    val edges = hashMapOf<String, HashSet<Graph.Edge>>()
-    val nodes = graph.nodes.map(Graph.Node::label).toHashSet()
+    val edges = hashMapOf<String, HashSet<Edge>>()
+    val nodes = graph.nodes.map(Node::label).toHashSet()
     for (edge in graph.edges) {
-        val (u, v, _, w) = edge
-        degrees[u] = (degrees[u] ?: 0.0) + w
-        degrees[v] = (degrees[v] ?: 0.0) + w
+        val (u, v, c, _) = edge
+        degrees[u] = (degrees[u] ?: 0.0) + c
+        degrees[v] = (degrees[v] ?: 0.0) + c
         edges.getOrPut(u, ::hashSetOf) += edge
         edges.getOrPut(v, ::hashSetOf) += edge
     }
@@ -113,6 +115,7 @@ private fun findBlob(
 
     var degreeSum = degrees.values.sum()
     fun density() = degreeSum / (nodes.size * (nodes.size - 1))
+
     while (nodes.size >= minSize) {
         if (blob == null || density() > blobDensity) {
             blob = nodes.toSet()
@@ -121,13 +124,13 @@ private fun findBlob(
 
         val node = heap.poll()
         for (edge in edges[node].orEmpty()) {
-            val (u, v, _, w) = edge
+            val (u, v, c, _) = edge
             val other = if (u == node) v else u
 
             heap -= other
-            degrees[other] = degrees.getValue(other) - w
+            degrees[other] = degrees.getValue(other) - c
             edges.getValue(other) -= edge
-            degreeSum -= 2 * w
+            degreeSum -= 2 * c
             heap += other
         }
         nodes -= node

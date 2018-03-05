@@ -28,9 +28,12 @@ data class FileReport(
     val types: List<TypeReport>
 ) {
 
+    private val blobCount get() =
+        if (components.graphSize <= MAX_GRAPH_SIZE) blobs.size
+        else components.graphSize
+
     val value: Int =
-        if (components.graphSize > MAX_GRAPH_SIZE) components.graphSize
-        else blobs.size
+        maxOf(blobCount, types.maxBy(TypeReport::value)?.value ?: 0)
 }
 
 data class TypeReport(
@@ -40,9 +43,12 @@ data class TypeReport(
     val types: List<TypeReport>
 ) {
 
+    private val blobCount get() =
+        if (components.graphSize <= MAX_GRAPH_SIZE) blobs.size
+        else components.graphSize
+
     val value: Int =
-        if (components.graphSize > MAX_GRAPH_SIZE) components.graphSize
-        else blobs.size
+        maxOf(blobCount, types.maxBy(TypeReport::value)?.value ?: 0)
 }
 
 private val List<Set<String>>.graphSize: Int get() = sumBy(Set<String>::size)

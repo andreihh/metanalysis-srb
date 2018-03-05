@@ -205,7 +205,7 @@ class HistoryVisitor private constructor(options: Options) {
         init {
             require(minCoupling >= 0.0) { "Invalid coupling '$minCoupling'!" }
             require(minRevisions > 0) { "Invalid revisions '$minRevisions'!" }
-            require(minBlobSize > 0) { "Invalid blob size '$minBlobSize'!" }
+            require(minBlobSize > 1) { "Invalid blob size '$minBlobSize'!" }
             require(minBlobCoupling >= 0.0) {
                 "Invalid blob coupling '$minBlobCoupling'!"
             }
