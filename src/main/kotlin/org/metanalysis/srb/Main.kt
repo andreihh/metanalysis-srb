@@ -44,19 +44,19 @@ fun main(args: Array<String>) {
         .singleOrNull { it.startsWith("--min-blob-size=") }
         ?.removePrefix("--min-blob-size=")
         ?.toInt()
-        ?: 5
-    val minBlobCoupling = args
-        .singleOrNull { it.startsWith("--min-blob-coupling=") }
-        ?.removePrefix("--min-blob-coupling=")
+        ?: 2
+    val minBlobDensity = args
+        .singleOrNull { it.startsWith("--min-blob-density=") }
+        ?.removePrefix("--min-blob-density=")
         ?.toDouble()
-        ?: 0.1
+        ?: 3.0
 
     val options = Options(
         publicOnly = publicOnly,
         minCoupling = minCoupling,
         minRevisions = minRevisions,
         minBlobSize = minBlobSize,
-        minBlobCoupling = minBlobCoupling
+        minBlobDensity = minBlobDensity
     )
 
     val repository = loadRepository()

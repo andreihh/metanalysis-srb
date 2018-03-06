@@ -38,7 +38,7 @@ class HistoryVisitor private constructor(options: Options) {
     private val minCoupling = options.minCoupling
     private val minRevisions = options.minRevisions
     private val minBlobSize = options.minBlobSize
-    private val minBlobDensity = options.minBlobCoupling
+    private val minBlobDensity = options.minBlobDensity
 
     private val project = Project.empty()
     private val changesByParent = hashMapOf<String, HashMap<String, Int>>()
@@ -164,7 +164,7 @@ class HistoryVisitor private constructor(options: Options) {
         val components = graph?.findComponents().orEmpty()
         val blobs = graph?.findBlobs(minBlobSize, minBlobDensity).orEmpty()
         if (graph != null) {
-            graphs[type.id] = graph.colorNodes(components, blobs)
+            graphs[type.id] = graph.colorNodes(blobs)
         }
         return TypeReport(type.name, components, blobs, types)
     }
@@ -181,7 +181,7 @@ class HistoryVisitor private constructor(options: Options) {
         val components = graph?.findComponents().orEmpty()
         val blobs = graph?.findBlobs(minBlobSize, minBlobDensity).orEmpty()
         if (graph != null) {
-            graphs[unit.id] = graph.colorNodes(components, blobs)
+            graphs[unit.id] = graph.colorNodes(blobs)
         }
         return FileReport(unit.path, components, blobs, types)
     }
@@ -199,15 +199,15 @@ class HistoryVisitor private constructor(options: Options) {
         val minCoupling: Double,
         val minRevisions: Int,
         val minBlobSize: Int,
-        val minBlobCoupling: Double
+        val minBlobDensity: Double
     ) {
 
         init {
             require(minCoupling >= 0.0) { "Invalid coupling '$minCoupling'!" }
             require(minRevisions > 0) { "Invalid revisions '$minRevisions'!" }
             require(minBlobSize > 1) { "Invalid blob size '$minBlobSize'!" }
-            require(minBlobCoupling >= 0.0) {
-                "Invalid blob coupling '$minBlobCoupling'!"
+            require(minBlobDensity >= 0.0) {
+                "Invalid blob density '$minBlobDensity'!"
             }
         }
     }

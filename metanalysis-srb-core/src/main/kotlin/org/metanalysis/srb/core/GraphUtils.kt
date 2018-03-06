@@ -31,7 +31,7 @@ internal fun Graph.findComponents(): List<Set<String>> {
     val components = hashMapOf<String, HashSet<String>>()
     for (node in nodes) {
         val root = sets[node.label]
-        components.getOrPut(root, ::hashSetOf) += node.label
+        components.getOrPut(root, ::HashSet) += node.label
     }
     return components.values.toList()
 }
@@ -44,16 +44,15 @@ internal fun Graph.findBlobs(
     require(minDensity >= 0) { "Invalid blob density threshold '$minDensity'!" }
     if (nodes.size > MAX_GRAPH_SIZE) return emptyList()
     val blobs = arrayListOf<Subgraph>()
-    findBlobs(this, minSize, minDensity, blobs)
+    for (component in findComponents()) {
+        findBlobs(this.intersect(component), minSize, minDensity, blobs)
+    }
     return blobs
 }
 
-internal fun Graph.colorNodes(
-    components: List<Set<String>>,
-    blobs: List<Subgraph>
-): Graph {
+internal fun Graph.colorNodes(blobs: List<Subgraph>): Graph {
     val newColors = hashMapOf<String, Int>()
-    val colorGroups = components + blobs.map(Subgraph::nodes)
+    val colorGroups = blobs.map(Subgraph::nodes)
     var color = 0
     for (group in colorGroups) {
         color++
@@ -101,8 +100,8 @@ private fun findBlob(
         val (u, v, c, _) = edge
         degrees[u] = (degrees[u] ?: 0.0) + c
         degrees[v] = (degrees[v] ?: 0.0) + c
-        edges.getOrPut(u, ::hashSetOf) += edge
-        edges.getOrPut(v, ::hashSetOf) += edge
+        edges.getOrPut(u, ::HashSet) += edge
+        edges.getOrPut(v, ::HashSet) += edge
     }
 
     val heap = PriorityQueue<String>(maxOf(1, nodes.size)) { u, v ->
@@ -114,7 +113,7 @@ private fun findBlob(
     var blobDensity = 0.0
 
     var degreeSum = degrees.values.sum()
-    fun density() = degreeSum / (nodes.size * (nodes.size - 1))
+    fun density() = nodes.size * degreeSum / (nodes.size * (nodes.size - 1))
 
     while (nodes.size >= minSize) {
         if (blob == null || density() > blobDensity) {
@@ -145,6 +144,12 @@ private fun findBlob(
 private operator fun Graph.minus(nodes: Set<String>): Graph {
     val newNodes = this.nodes.filterNot { (label, _) -> label in nodes }
     val newEdges = edges.filterNot { (u, v, _, _) -> u in nodes || v in nodes }
+    return copy(nodes = newNodes.toSet(), edges = newEdges)
+}
+
+private fun Graph.intersect(nodes: Set<String>): Graph {
+    val newNodes = this.nodes.filter { (label, _) -> label in nodes }
+    val newEdges = edges.filter { (u, v, _, _) -> u in nodes && v in nodes }
     return copy(nodes = newNodes.toSet(), edges = newEdges)
 }
 

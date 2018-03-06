@@ -34,7 +34,7 @@ var svg = d3.select("svg"),
     width = +svg.attr("width"),
     height = +svg.attr("height"),
     radius = 5,
-    scale = 35;
+    scale = 30;
 
 var color = d3.scaleOrdinal(d3.schemeCategory20);
 
@@ -42,7 +42,7 @@ var simulation = d3.forceSimulation()
     .force("link", d3.forceLink()
         .id(function(d) { return d.label; })
         .distance(function(d) { return scale / d.coupling; })
-        .strength(function(d) { return d.coupling * d.revisions; }))
+        .strength(function(d) { return d.coupling; }))
     .force("charge", d3.forceManyBody()
         .strength(function() { return -scale; })
         .distanceMax(Math.min(width / 4, height / 4)))
