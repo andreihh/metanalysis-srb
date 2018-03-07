@@ -118,8 +118,7 @@ class HistoryVisitor private constructor(options: Options) {
     private fun isPublic(id: String): Boolean =
         VisibilityAnalyzer.isPublic(project, id)
 
-    private fun takeNode(id: String): Boolean =
-        !publicOnly || isPublic(id)
+    private fun takeNode(id: String): Boolean = !publicOnly || isPublic(id)
 
     private fun takeEdge(edge: Graph.Edge): Boolean {
         val (id1, id2, coupling, revisions) = edge
@@ -139,12 +138,12 @@ class HistoryVisitor private constructor(options: Options) {
                 .filter(::takeNode)
                 .map { Node(it.label()) }
                 .toSet()
-            val edges = changesByPair.map { (pair, jointCount) ->
+            val edges = changesByPair.map { (pair, revisions) ->
                 val (id1, id2) = pair
                 val countId1 = changesById.getValue(id1)
                 val countId2 = changesById.getValue(id2)
-                val revisions = countId1 + countId2 - jointCount
-                val coupling = 1.0 * jointCount / revisions
+                val totalCount = countId1 + countId2 - revisions
+                val coupling = 1.0 * revisions / totalCount
                 Edge(id1.label(), id2.label(), coupling, revisions)
             }.filter(::takeEdge)
             graphs[parent] = Graph(parent, nodes, edges)
@@ -205,7 +204,7 @@ class HistoryVisitor private constructor(options: Options) {
         init {
             require(minCoupling >= 0.0) { "Invalid coupling '$minCoupling'!" }
             require(minRevisions > 0) { "Invalid revisions '$minRevisions'!" }
-            require(minBlobSize > 1) { "Invalid blob size '$minBlobSize'!" }
+            require(minBlobSize > 0) { "Invalid blob size '$minBlobSize'!" }
             require(minBlobDensity >= 0.0) {
                 "Invalid blob density '$minBlobDensity'!"
             }

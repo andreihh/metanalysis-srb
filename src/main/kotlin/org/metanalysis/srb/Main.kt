@@ -44,12 +44,12 @@ fun main(args: Array<String>) {
         .singleOrNull { it.startsWith("--min-blob-size=") }
         ?.removePrefix("--min-blob-size=")
         ?.toInt()
-        ?: 2
+        ?: 1
     val minBlobDensity = args
         .singleOrNull { it.startsWith("--min-blob-density=") }
         ?.removePrefix("--min-blob-density=")
         ?.toDouble()
-        ?: 3.0
+        ?: 2.5
 
     val options = Options(
         publicOnly = publicOnly,

@@ -40,8 +40,8 @@ internal fun Graph.findBlobs(
     minSize: Int,
     minDensity: Double
 ): List<Subgraph> {
-    require(minSize > 1) { "Invalid blob size threshold '$minSize'!" }
-    require(minDensity >= 0) { "Invalid blob density threshold '$minDensity'!" }
+    require(minSize > 0) { "Invalid blob size '$minSize'!" }
+    require(minDensity >= 0.0) { "Invalid blob density '$minDensity'!" }
     if (nodes.size > MAX_GRAPH_SIZE) return emptyList()
     val blobs = arrayListOf<Subgraph>()
     for (component in findComponents()) {
@@ -104,7 +104,7 @@ private fun findBlob(
         edges.getOrPut(v, ::HashSet) += edge
     }
 
-    val heap = PriorityQueue<String>(maxOf(1, nodes.size)) { u, v ->
+    val heap = PriorityQueue<String>(nodes.size.coerceAtLeast(1)) { u, v ->
         compareValues(degrees[u], degrees[v])
     }
     heap += nodes
@@ -113,7 +113,7 @@ private fun findBlob(
     var blobDensity = 0.0
 
     var degreeSum = degrees.values.sum()
-    fun density() = nodes.size * degreeSum / (nodes.size * (nodes.size - 1))
+    fun density() = degreeSum / nodes.size
 
     while (nodes.size >= minSize) {
         if (blob == null || density() > blobDensity) {
