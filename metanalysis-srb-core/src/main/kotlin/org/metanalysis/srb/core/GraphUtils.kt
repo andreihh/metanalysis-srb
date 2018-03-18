@@ -42,7 +42,11 @@ internal fun Graph.findBlobs(
 ): List<Subgraph> {
     require(minSize > 0) { "Invalid blob size '$minSize'!" }
     require(minDensity >= 0.0) { "Invalid blob density '$minDensity'!" }
-    if (nodes.size > MAX_GRAPH_SIZE) return emptyList()
+    if (nodes.size > MAX_GRAPH_SIZE) {
+        return nodes.map { (label, _, _) ->
+            Subgraph(nodes = setOf(label), density = 0.0)
+        }
+    }
     val blobs = arrayListOf<Subgraph>()
     for (component in findComponents()) {
         findBlobs(this.intersect(component), minSize, minDensity, blobs)
@@ -61,8 +65,9 @@ internal fun Graph.colorNodes(blobs: List<Subgraph>): Graph {
         }
     }
 
-    val newNodes = nodes.map { (label, _) ->
-        Graph.Node(label = label, color = newColors[label] ?: 0)
+    val newNodes = nodes.map { (label, revisions, _) ->
+        val newColor = newColors[label] ?: 0
+        Graph.Node(label, revisions, newColor)
     }
     return copy(nodes = newNodes.toSet())
 }
@@ -97,7 +102,7 @@ private fun findBlob(
     val edges = hashMapOf<String, HashSet<Edge>>()
     val nodes = graph.nodes.map(Node::label).toHashSet()
     for (edge in graph.edges) {
-        val (u, v, c, _) = edge
+        val (u, v, _, c) = edge
         degrees[u] = (degrees[u] ?: 0.0) + c
         degrees[v] = (degrees[v] ?: 0.0) + c
         edges.getOrPut(u, ::HashSet) += edge
@@ -123,7 +128,7 @@ private fun findBlob(
 
         val node = heap.poll()
         for (edge in edges[node].orEmpty()) {
-            val (u, v, c, _) = edge
+            val (u, v, _, c) = edge
             val other = if (u == node) v else u
 
             heap -= other

@@ -23,32 +23,10 @@ data class Report(
 
 data class FileReport(
     val file: String,
-    val components: List<Set<String>>,
     val blobs: List<Graph.Subgraph>,
-    val types: List<TypeReport>
+    val antiBlob: Set<String>?
 ) {
-
-    private val blobCount get() =
-        if (components.graphSize <= MAX_GRAPH_SIZE) blobs.size
-        else components.graphSize
-
-    val value: Int =
-        maxOf(blobCount, types.maxBy(TypeReport::value)?.value ?: 0)
+    val category: String = "SOLID Breakers"
+    val name: String = "Single-Responsibility Breakers"
+    val value: Int = blobs.size + if (antiBlob != null) 1 else 0
 }
-
-data class TypeReport(
-    val name: String,
-    val components: List<Set<String>>,
-    val blobs: List<Graph.Subgraph>,
-    val types: List<TypeReport>
-) {
-
-    private val blobCount get() =
-        if (components.graphSize <= MAX_GRAPH_SIZE) blobs.size
-        else components.graphSize
-
-    val value: Int =
-        maxOf(blobCount, types.maxBy(TypeReport::value)?.value ?: 0)
-}
-
-private val List<Set<String>>.graphSize: Int get() = sumBy(Set<String>::size)

@@ -18,16 +18,13 @@ package org.metanalysis.srb.core
 
 import org.metanalysis.core.model.AddNode
 import org.metanalysis.core.model.EditFunction
-import org.metanalysis.core.model.EditVariable
 import org.metanalysis.core.model.Function
 import org.metanalysis.core.model.Project
 import org.metanalysis.core.model.RemoveNode
 import org.metanalysis.core.model.SourceEntity
 import org.metanalysis.core.model.SourceNode
-import org.metanalysis.core.model.SourceNode.Companion.ENTITY_SEPARATOR
 import org.metanalysis.core.model.SourceUnit
-import org.metanalysis.core.model.Type
-import org.metanalysis.core.model.parentId
+import org.metanalysis.core.model.sourcePath
 import org.metanalysis.core.model.walkSourceTree
 import org.metanalysis.core.repository.Transaction
 import org.metanalysis.srb.core.Graph.Edge
@@ -35,18 +32,18 @@ import org.metanalysis.srb.core.Graph.Node
 
 class HistoryVisitor private constructor(options: Options) {
     private val publicOnly = options.publicOnly
+    private val maxChangeSet = options.maxChangeSet
     private val minCoupling = options.minCoupling
     private val minRevisions = options.minRevisions
     private val minBlobSize = options.minBlobSize
     private val minBlobDensity = options.minBlobDensity
 
     private val project = Project.empty()
-    private val changesByParent = hashMapOf<String, HashMap<String, Int>>()
-    private val jointChangesByParent =
-        hashMapOf<String, HashMap<Pair<String, String>, Int>>()
+    private val changes = hashMapOf<String, Int>()
+    private val jointChanges = hashMapOf<String, HashMap<String, Int>>()
 
-    private fun getParentId(id: String): String =
-        project.get<SourceEntity>(id).parentId
+    private fun getSourcePath(id: String): String =
+        project.get<SourceEntity>(id).sourcePath
 
     private fun visit(edit: AddNode): Set<String> {
         val addedNodes = edit.node.walkSourceTree()
@@ -56,61 +53,47 @@ class HistoryVisitor private constructor(options: Options) {
 
     private fun visit(edit: RemoveNode): Set<String> {
         val removedNode = project.get<SourceNode>(edit.id)
-        val removedNodes = removedNode.walkSourceTree()
-        val removedFunctions = removedNodes.filterIsInstance<Function>()
-        val removedIds = removedNodes.map(SourceNode::id).toSet()
+        val removedIds = removedNode
+            .walkSourceTree()
+            .filterIsInstance<Function>()
+            .map(Function::id)
+            .toSet()
 
-        for (function in removedFunctions) {
-            val parentId = function.parentId
-
-            val changes = changesByParent.getValue(parentId)
-            changes -= function.id
-
-            val jointChanges = jointChangesByParent.getValue(parentId)
-            val toRemove = jointChanges.keys
-                .filter { (id1, id2) -> id1 in removedIds || id2 in removedIds }
-            jointChanges -= toRemove
+        changes -= removedIds
+        for (id in removedIds) {
+            for (otherId in jointChanges[id].orEmpty().keys) {
+                jointChanges[otherId]?.remove(id)
+            }
+            jointChanges -= id
         }
 
-        changesByParent -= removedIds
-        jointChangesByParent -= removedIds
-        return removedFunctions.map(Function::id).toSet()
+        return removedIds
     }
 
-    private fun visit(transaction: Transaction): Map<String, List<String>> {
+    private fun visit(transaction: Transaction): Set<String> {
         val editedIds = hashSetOf<String>()
         for (edit in transaction.edits) {
             when (edit) {
                 is AddNode -> editedIds += visit(edit)
                 is RemoveNode -> editedIds -= visit(edit)
                 is EditFunction -> editedIds += edit.id
-                is EditVariable -> {
-                    val parent = project.get<SourceNode>(getParentId(edit.id))
-                    if (parent is Function) {
-                        editedIds += parent.id
-                    }
-                }
             }
             project.apply(edit)
         }
-        return editedIds.groupBy(::getParentId)
+        return editedIds
     }
 
     private fun analyze(transaction: Transaction) {
-        val editedIdsByParent = visit(transaction)
-        for ((parent, editedIds) in editedIdsByParent) {
-            val changes = changesByParent.getOrPut(parent, ::HashMap)
-            val jointChanges = jointChangesByParent.getOrPut(parent, ::HashMap)
-
-            for (id in editedIds) {
-                changes[id] = (changes[id] ?: 0) + 1
-            }
-            for (id1 in editedIds) {
-                for (id2 in editedIds) {
-                    if (id1 >= id2) continue
-                    val pair = id1 to id2
-                    jointChanges[pair] = (jointChanges[pair] ?: 0) + 1
-                }
+        val editedIds = visit(transaction)
+        for (id in editedIds) {
+            changes[id] = (changes[id] ?: 0) + 1
+        }
+        if (transaction.changeSet.size > maxChangeSet) return
+        for (id1 in editedIds) {
+            for (id2 in editedIds) {
+                if (id1 == id2) continue
+                val jointChangesWithId1 = jointChanges.getOrPut(id1, ::HashMap)
+                jointChangesWithId1[id2] = (jointChangesWithId1[id2] ?: 0) + 1
             }
         }
     }
@@ -121,68 +104,53 @@ class HistoryVisitor private constructor(options: Options) {
     private fun takeNode(id: String): Boolean = !publicOnly || isPublic(id)
 
     private fun takeEdge(edge: Graph.Edge): Boolean {
-        val (id1, id2, coupling, revisions) = edge
+        val (id1, id2, revisions, coupling) = edge
         return (!publicOnly || (isPublic(id1) && isPublic(id2)))
-            && coupling >= minCoupling
             && revisions >= minRevisions
+            && coupling >= minCoupling
     }
 
     private fun aggregateGraphs(): HashMap<String, Graph> {
         val graphs = hashMapOf<String, Graph>()
-        for ((parent, changesByPair) in jointChangesByParent) {
-            fun String.label(): String =
-                removePrefix("$parent$ENTITY_SEPARATOR")
+        val idsByFile = changes.keys
+            .groupBy(::getSourcePath)
+            .mapValues { (_, ids) -> ids.toSet() }
 
-            val changesById = changesByParent.getValue(parent)
-            val nodes = changesById.keys
-                .filter(::takeNode)
-                .map { Node(it.label()) }
-                .toSet()
-            val edges = changesByPair.map { (pair, revisions) ->
-                val (id1, id2) = pair
-                val countId1 = changesById.getValue(id1)
-                val countId2 = changesById.getValue(id2)
-                val totalCount = countId1 + countId2 - revisions
-                val coupling = 1.0 * revisions / totalCount
-                Edge(id1.label(), id2.label(), coupling, revisions)
+        for ((path, ids) in idsByFile) {
+            val edges = ids.flatMap { id1 ->
+                jointChanges[id1].orEmpty()
+                    .filter { (id2, _) -> id1 < id2 }
+                    .map { (id2, revisions) ->
+                        val countId1 = changes.getValue(id1)
+                        val countId2 = changes.getValue(id2)
+                        val totalCount = countId1 + countId2 - revisions
+                        val coupling = 1.0 * revisions / totalCount
+                        Edge(id1, id2, revisions, coupling)
+                    }
             }.filter(::takeEdge)
-            graphs[parent] = Graph(parent, nodes, edges)
+
+            val nodes =
+                (ids + edges.flatMap { (id1, id2, _, _) -> listOf(id1, id2) })
+                    .filter(::takeNode)
+                    .map { id -> Node(id, changes.getValue(id)) }
+                    .toSet()
+
+            graphs[path] = Graph(path, nodes, edges)
         }
         return graphs
     }
 
     private fun aggregate(
         graphs: HashMap<String, Graph>,
-        type: Type
-    ): TypeReport {
-        val types = type.members
-            .filterIsInstance<Type>()
-            .map { aggregate(graphs, it) }
-            .sortedByDescending(TypeReport::value)
-        val graph = graphs[type.id]
-        val components = graph?.findComponents().orEmpty()
-        val blobs = graph?.findBlobs(minBlobSize, minBlobDensity).orEmpty()
-        if (graph != null) {
-            graphs[type.id] = graph.colorNodes(blobs)
-        }
-        return TypeReport(type.name, components, blobs, types)
-    }
-
-    private fun aggregate(
-        graphs: HashMap<String, Graph>,
         unit: SourceUnit
     ): FileReport {
-        val types = unit.entities
-            .filterIsInstance<Type>()
-            .map { aggregate(graphs, it) }
-            .sortedByDescending(TypeReport::value)
         val graph = graphs[unit.id]
-        val components = graph?.findComponents().orEmpty()
         val blobs = graph?.findBlobs(minBlobSize, minBlobDensity).orEmpty()
         if (graph != null) {
             graphs[unit.id] = graph.colorNodes(blobs)
         }
-        return FileReport(unit.path, components, blobs, types)
+        val antiBlob = null
+        return FileReport(unit.path, blobs, antiBlob)
     }
 
     private fun aggregate(): Report {
@@ -195,6 +163,7 @@ class HistoryVisitor private constructor(options: Options) {
 
     data class Options(
         val publicOnly: Boolean,
+        val maxChangeSet: Int,
         val minCoupling: Double,
         val minRevisions: Int,
         val minBlobSize: Int,
@@ -202,6 +171,7 @@ class HistoryVisitor private constructor(options: Options) {
     ) {
 
         init {
+            require(maxChangeSet > 0) { "Invalid change set '$maxChangeSet'!" }
             require(minCoupling >= 0.0) { "Invalid coupling '$minCoupling'!" }
             require(minRevisions > 0) { "Invalid revisions '$minRevisions'!" }
             require(minBlobSize > 0) { "Invalid blob size '$minBlobSize'!" }

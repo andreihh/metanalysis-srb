@@ -22,13 +22,13 @@ data class Graph(
     val edges: List<Edge>
 ) {
 
-    data class Node(val label: String, val color: Int = 0)
+    data class Node(val label: String, val revisions: Int, val color: Int = 0)
 
     data class Edge(
         val source: String,
         val target: String,
-        val coupling: Double,
-        val revisions: Int
+        val revisions: Int,
+        val coupling: Double
     )
 
     data class Subgraph(val nodes: Set<String>, val density: Double)

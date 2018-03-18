@@ -35,6 +35,11 @@ fun main(args: Array<String>) {
         ?.removePrefix("--min-coupling=")
         ?.toDouble()
         ?: 0.1
+    val maxChangeSet = args
+        .singleOrNull { it.startsWith("--max-change-set=") }
+        ?.removePrefix("--max-change-set=")
+        ?.toInt()
+        ?: 50
     val minRevisions = args
         .singleOrNull { it.startsWith("--min-revisions=") }
         ?.removePrefix("--min-revisions=")
@@ -53,6 +58,7 @@ fun main(args: Array<String>) {
 
     val options = Options(
         publicOnly = publicOnly,
+        maxChangeSet = maxChangeSet,
         minCoupling = minCoupling,
         minRevisions = minRevisions,
         minBlobSize = minBlobSize,
