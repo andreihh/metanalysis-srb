@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package org.metanalysis.srb.core
+package org.metanalysis.srb
 
-import org.metanalysis.srb.core.Graph.Edge
-import org.metanalysis.srb.core.Graph.Node
-import org.metanalysis.srb.core.Graph.Subgraph
+import org.metanalysis.srb.Graph.Edge
+import org.metanalysis.srb.Graph.Node
+import org.metanalysis.srb.Graph.Subgraph
 import java.util.PriorityQueue
 
 internal const val MAX_GRAPH_SIZE: Int = 300

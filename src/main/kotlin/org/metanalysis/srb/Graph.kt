@@ -14,19 +14,22 @@
  * limitations under the License.
  */
 
-package org.metanalysis.srb.core
+package org.metanalysis.srb
 
-data class Report(
-    val files: List<FileReport>,
-    val graphs: List<Graph>
-)
-
-data class FileReport(
-    val file: String,
-    val blobs: List<Graph.Subgraph>,
-    val antiBlob: Set<String>?
+data class Graph(
+    val label: String,
+    val nodes: Set<Node>,
+    val edges: List<Edge>
 ) {
-    val category: String = "SOLID Breakers"
-    val name: String = "Single-Responsibility Breakers"
-    val value: Int = blobs.size + if (antiBlob != null) 1 else 0
+
+    data class Node(val label: String, val revisions: Int, val color: Int = 0)
+
+    data class Edge(
+        val source: String,
+        val target: String,
+        val revisions: Int,
+        val coupling: Double
+    )
+
+    data class Subgraph(val nodes: Set<String>, val density: Double)
 }

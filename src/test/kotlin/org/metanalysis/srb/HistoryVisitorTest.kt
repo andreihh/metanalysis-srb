@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.metanalysis.srb.core
+package org.metanalysis.srb
 
 import org.junit.Test
 import org.metanalysis.test.core.repository.repository
@@ -50,11 +50,11 @@ class HistoryVisitorTest {
 
     @Test fun `smoke test`() {
         val options = HistoryVisitor.Options(
-            publicOnly = false,
+            maxChangeSet = 50,
             minCoupling = 0.0,
             minRevisions = 1,
             minBlobSize = 1,
-            minBlobCoupling = 0.0
+            minBlobDensity = 0.0
         )
         HistoryVisitor.analyze(repositoryMock.getHistory(), options)
     }

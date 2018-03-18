@@ -21,15 +21,14 @@ import org.metanalysis.core.model.SourceNode.Companion.PATH_SEPARATOR
 import org.metanalysis.core.repository.PersistentRepository
 import org.metanalysis.core.repository.Repository
 import org.metanalysis.core.serialization.JsonModule
-import org.metanalysis.srb.core.HistoryVisitor.Companion.analyze
-import org.metanalysis.srb.core.HistoryVisitor.Options
+import org.metanalysis.srb.HistoryVisitor.Companion.analyze
+import org.metanalysis.srb.HistoryVisitor.Options
 import java.io.File
 
 private fun loadRepository(): Repository =
     PersistentRepository.load() ?: error("Repository not found!")
 
 fun main(args: Array<String>) {
-    val publicOnly = "--public-only" in args
     val minCoupling = args
         .singleOrNull { it.startsWith("--min-coupling=") }
         ?.removePrefix("--min-coupling=")
@@ -57,7 +56,6 @@ fun main(args: Array<String>) {
         ?: 2.5
 
     val options = Options(
-        publicOnly = publicOnly,
         maxChangeSet = maxChangeSet,
         minCoupling = minCoupling,
         minRevisions = minRevisions,

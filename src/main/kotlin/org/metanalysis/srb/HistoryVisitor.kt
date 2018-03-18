@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.metanalysis.srb.core
+package org.metanalysis.srb
 
 import org.metanalysis.core.model.AddNode
 import org.metanalysis.core.model.EditFunction
@@ -27,11 +27,10 @@ import org.metanalysis.core.model.SourceUnit
 import org.metanalysis.core.model.sourcePath
 import org.metanalysis.core.model.walkSourceTree
 import org.metanalysis.core.repository.Transaction
-import org.metanalysis.srb.core.Graph.Edge
-import org.metanalysis.srb.core.Graph.Node
+import org.metanalysis.srb.Graph.Edge
+import org.metanalysis.srb.Graph.Node
 
 class HistoryVisitor private constructor(options: Options) {
-    private val publicOnly = options.publicOnly
     private val maxChangeSet = options.maxChangeSet
     private val minCoupling = options.minCoupling
     private val minRevisions = options.minRevisions
@@ -98,16 +97,11 @@ class HistoryVisitor private constructor(options: Options) {
         }
     }
 
-    private fun isPublic(id: String): Boolean =
-        VisibilityAnalyzer.isPublic(project, id)
-
-    private fun takeNode(id: String): Boolean = !publicOnly || isPublic(id)
+    private fun takeNode(id: String): Boolean = true
 
     private fun takeEdge(edge: Graph.Edge): Boolean {
-        val (id1, id2, revisions, coupling) = edge
-        return (!publicOnly || (isPublic(id1) && isPublic(id2)))
-            && revisions >= minRevisions
-            && coupling >= minCoupling
+        val (_, _, revisions, coupling) = edge
+        return revisions >= minRevisions && coupling >= minCoupling
     }
 
     private fun aggregateGraphs(): HashMap<String, Graph> {
@@ -162,7 +156,6 @@ class HistoryVisitor private constructor(options: Options) {
     }
 
     data class Options(
-        val publicOnly: Boolean,
         val maxChangeSet: Int,
         val minCoupling: Double,
         val minRevisions: Int,
