@@ -23,24 +23,7 @@ import java.util.PriorityQueue
 
 internal const val MAX_GRAPH_SIZE: Int = 300
 
-internal fun Graph.findComponents(): List<Set<String>> {
-    val sets = DisjointSets()
-    for (edge in edges) {
-        sets.merge(edge.source, edge.target)
-    }
-    val components = hashMapOf<String, HashSet<String>>()
-    for (node in nodes) {
-        val root = sets[node.label]
-        components.getOrPut(root, ::HashSet) += node.label
-    }
-    return components.values.toList()
-}
-
-internal fun Graph.findBlobs(
-    minSize: Int,
-    minDensity: Double
-): List<Subgraph> {
-    require(minSize > 0) { "Invalid blob size '$minSize'!" }
+internal fun Graph.findBlobs(minDensity: Double): List<Subgraph> {
     require(minDensity >= 0.0) { "Invalid blob density '$minDensity'!" }
     if (nodes.size > MAX_GRAPH_SIZE) {
         return nodes.map { (label, _, _) ->
@@ -49,14 +32,37 @@ internal fun Graph.findBlobs(
     }
     val blobs = arrayListOf<Subgraph>()
     for (component in findComponents()) {
-        findBlobs(this.intersect(component), minSize, minDensity, blobs)
+        findBlobs(this.intersect(component), minDensity, blobs)
     }
     return blobs
 }
 
-internal fun Graph.colorNodes(blobs: List<Subgraph>): Graph {
+internal fun Graph.findAntiBlob(
+    maxCoupling: Double,
+    minSize: Int
+): Set<String>? {
+    require(maxCoupling >= 0.0) { "Invalid anti-blob coupling '$maxCoupling'!" }
+    require(minSize > 0) { "Invalid anti-blob size '$minSize'!" }
+    val coupling = hashMapOf<String, Double>()
+    for ((u, v, _, c) in edges) {
+        coupling[u] = (coupling[u] ?: 0.0) + c
+        coupling[v] = (coupling[v] ?: 0.0) + c
+    }
+    val antiBlob = hashSetOf<String>()
+    for ((label, _) in nodes) {
+        if ((coupling[label] ?: 0.0) <= maxCoupling) {
+            antiBlob += label
+        }
+    }
+    return if (antiBlob.size >= minSize) antiBlob else null
+}
+
+internal fun Graph.colorNodes(
+    blobs: List<Subgraph>,
+    antiBlob: Set<String>?
+): Graph {
     val newColors = hashMapOf<String, Int>()
-    val colorGroups = blobs.map(Subgraph::nodes)
+    val colorGroups = blobs.map(Subgraph::nodes) + listOfNotNull(antiBlob)
     var color = 0
     for (group in colorGroups) {
         color++
@@ -93,9 +99,21 @@ private class DisjointSets {
     }
 }
 
+private fun Graph.findComponents(): List<Set<String>> {
+    val sets = DisjointSets()
+    for (edge in edges) {
+        sets.merge(edge.source, edge.target)
+    }
+    val components = hashMapOf<String, HashSet<String>>()
+    for (node in nodes) {
+        val root = sets[node.label]
+        components.getOrPut(root, ::HashSet) += node.label
+    }
+    return components.values.toList()
+}
+
 private fun findBlob(
     graph: Graph,
-    minSize: Int,
     minDensity: Double
 ): Subgraph? {
     val degrees = hashMapOf<String, Double>()
@@ -120,7 +138,7 @@ private fun findBlob(
     var degreeSum = degrees.values.sum()
     fun density() = degreeSum / nodes.size
 
-    while (nodes.size >= minSize) {
+    while (nodes.isNotEmpty()) {
         if (blob == null || density() > blobDensity) {
             blob = nodes.toSet()
             blobDensity = density()
@@ -158,16 +176,15 @@ private fun Graph.intersect(nodes: Set<String>): Graph {
     return copy(nodes = newNodes.toSet(), edges = newEdges)
 }
 
-private tailrec fun findBlobs(
+private fun findBlobs(
     graph: Graph,
-    minSize: Int,
     minDensity: Double,
     blobs: ArrayList<Subgraph>
 ) {
-    val blob = findBlob(graph, minSize, minDensity)
+    val blob = findBlob(graph, minDensity)
     if (blob != null) {
         blobs.add(blob)
         val remainingGraph = graph - blob.nodes
-        findBlobs(remainingGraph, minSize, minDensity, blobs)
+        findBlobs(remainingGraph, minDensity, blobs)
     }
 }

@@ -34,8 +34,9 @@ class HistoryVisitor private constructor(options: Options) {
     private val maxChangeSet = options.maxChangeSet
     private val minCoupling = options.minCoupling
     private val minRevisions = options.minRevisions
-    private val minBlobSize = options.minBlobSize
     private val minBlobDensity = options.minBlobDensity
+    private val maxAntiCoupling = options.maxAntiCoupling
+    private val minAntiBlobSize = options.minAntiBlobSize
 
     private val project = Project.empty()
     private val changes = hashMapOf<String, Int>()
@@ -97,7 +98,8 @@ class HistoryVisitor private constructor(options: Options) {
         }
     }
 
-    private fun takeNode(id: String): Boolean = true
+    private fun takeNode(node: Graph.Node): Boolean =
+        node.revisions >= minRevisions
 
     private fun takeEdge(edge: Graph.Edge): Boolean {
         val (_, _, revisions, coupling) = edge
@@ -125,8 +127,8 @@ class HistoryVisitor private constructor(options: Options) {
 
             val nodes =
                 (ids + edges.flatMap { (id1, id2, _, _) -> listOf(id1, id2) })
-                    .filter(::takeNode)
                     .map { id -> Node(id, changes.getValue(id)) }
+                    .filter(::takeNode)
                     .toSet()
 
             graphs[path] = Graph(path, nodes, edges)
@@ -139,11 +141,11 @@ class HistoryVisitor private constructor(options: Options) {
         unit: SourceUnit
     ): FileReport {
         val graph = graphs[unit.id]
-        val blobs = graph?.findBlobs(minBlobSize, minBlobDensity).orEmpty()
+        val blobs = graph?.findBlobs(minBlobDensity).orEmpty()
+        val antiBlob = graph?.findAntiBlob(maxAntiCoupling, minAntiBlobSize)
         if (graph != null) {
-            graphs[unit.id] = graph.colorNodes(blobs)
+            graphs[unit.id] = graph.colorNodes(blobs, antiBlob)
         }
-        val antiBlob = null
         return FileReport(unit.path, blobs, antiBlob)
     }
 
@@ -159,17 +161,23 @@ class HistoryVisitor private constructor(options: Options) {
         val maxChangeSet: Int,
         val minCoupling: Double,
         val minRevisions: Int,
-        val minBlobSize: Int,
-        val minBlobDensity: Double
+        val minBlobDensity: Double,
+        val maxAntiCoupling: Double,
+        val minAntiBlobSize: Int
     ) {
 
         init {
             require(maxChangeSet > 0) { "Invalid change set '$maxChangeSet'!" }
             require(minCoupling >= 0.0) { "Invalid coupling '$minCoupling'!" }
             require(minRevisions > 0) { "Invalid revisions '$minRevisions'!" }
-            require(minBlobSize > 0) { "Invalid blob size '$minBlobSize'!" }
             require(minBlobDensity >= 0.0) {
                 "Invalid blob density '$minBlobDensity'!"
+            }
+            require(maxAntiCoupling >= 0.0) {
+                "Invalid coupling '$maxAntiCoupling'!"
+            }
+            require(minAntiBlobSize > 0) {
+                "Invalid anti blob size '$minAntiBlobSize'!"
             }
         }
     }
