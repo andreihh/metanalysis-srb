@@ -51,8 +51,11 @@ var simulation = d3.forceSimulation()
     //.force("x", d3.forceX(width / 2))
     //.force("y", d3.forceY(height / 2));
 
-d3.json("file.json", function(error, graph) {
+d3.json("file.json", function(error, coloredGraph) {
   if (error) throw error;
+
+  var graph = coloredGraph.graph;
+  var colors = coloredGraph.colors;
 
   var link = svg.append("g")
       .attr("class", "links")
@@ -67,7 +70,7 @@ d3.json("file.json", function(error, graph) {
     .data(graph.nodes)
     .enter().append("circle")
       .attr("r", radius)
-      .attr("fill", function(d) { return color(d.color); })
+      .attr("fill", function(d) { return color(colors[d.label]); })
       .call(d3.drag()
           .on("start", dragstarted)
           .on("drag", dragged)

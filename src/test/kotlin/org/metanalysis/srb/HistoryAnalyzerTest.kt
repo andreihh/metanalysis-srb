@@ -19,19 +19,19 @@ package org.metanalysis.srb
 import org.junit.Test
 import org.metanalysis.test.core.repository.repository
 
-class HistoryVisitorTest {
+class HistoryAnalyzerTest {
     private val repositoryMock =
         repository {
             transaction("0") {
-                addSourceUnit("Main.java") {
+                addSourceFile("Main.java") {
                     function("getVersion(String)") {
-                        parameter("name") {}
+                        parameters("name")
                     }
                 }
             }
             transaction("1") {
                 addFunction("Main.java:setVersion(String)") {
-                    parameter("name") {}
+                    parameters("name")
                 }
                 addType("Main.java:Main") {
                     function("getName()") {}
@@ -41,21 +41,16 @@ class HistoryVisitorTest {
                 editFunction("Main.java:setVersion(String)") {
                     modifiers { +"private" }
                 }
-                editVariable("Main.java:getVersion(String):name") {
-                    modifiers { +"public" }
-                }
                 removeNode("Main.java:Main")
             }
         }
 
     @Test fun `smoke test`() {
-        val options = HistoryVisitor.Options(
+        val analyzer = HistoryAnalyzer(
             maxChangeSet = 50,
             minCoupling = 0.0,
-            minRevisions = 1,
-            minBlobSize = 1,
-            minBlobDensity = 0.0
+            minRevisions = 1
         )
-        HistoryVisitor.analyze(repositoryMock.getHistory(), options)
+        analyzer.analyze(repositoryMock.getHistory())
     }
 }

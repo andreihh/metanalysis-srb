@@ -16,19 +16,25 @@
 
 package org.metanalysis.srb
 
-import org.metanalysis.srb.Graph.Subgraph
+import org.metanalysis.srb.Graph.Node
 
-data class Report(
-    val files: List<FileReport>,
-    val graphs: List<Graph>
-)
+data class ColoredGraph(val graph: Graph, val colors: Map<String, Int>) {
+    init {
+        require(graph.nodes.map(Node::label).toSet() == colors.keys)
+    }
+}
 
-data class FileReport(
-    val file: String,
-    val blobs: List<Subgraph>,
-    val antiBlob: Set<String>?
-) {
-    val category: String = "SOLID Breakers"
-    val name: String = "Single-Responsibility Breakers"
-    val value: Int = blobs.size + if (antiBlob != null) 1 else 0
+fun Graph.colorNodes(groups: Collection<Set<String>>): ColoredGraph {
+    val colors = hashMapOf<String, Int>()
+    var color = 0
+    for ((label, _) in nodes) {
+        colors[label] = color
+    }
+    for (group in groups) {
+        color++
+        for (label in group) {
+            colors[label] = color
+        }
+    }
+    return ColoredGraph(this, colors)
 }

@@ -23,20 +23,23 @@ import org.metanalysis.core.model.Project
 import org.metanalysis.core.model.RemoveNode
 import org.metanalysis.core.model.SourceEntity
 import org.metanalysis.core.model.SourceNode
-import org.metanalysis.core.model.SourceUnit
 import org.metanalysis.core.model.sourcePath
 import org.metanalysis.core.model.walkSourceTree
 import org.metanalysis.core.repository.Transaction
 import org.metanalysis.srb.Graph.Edge
 import org.metanalysis.srb.Graph.Node
 
-class HistoryVisitor private constructor(options: Options) {
-    private val maxChangeSet = options.maxChangeSet
-    private val minCoupling = options.minCoupling
-    private val minRevisions = options.minRevisions
-    private val minBlobDensity = options.minBlobDensity
-    private val maxAntiCoupling = options.maxAntiCoupling
-    private val minAntiBlobSize = options.minAntiBlobSize
+class HistoryAnalyzer(
+    private val maxChangeSet: Int,
+    private val minRevisions: Int,
+    private val minCoupling: Double
+) {
+
+    init {
+        require(maxChangeSet > 0) { "Invalid change set '$maxChangeSet'!" }
+        require(minRevisions > 0) { "Invalid revisions '$minRevisions'!" }
+        require(minCoupling >= 0.0) { "Invalid coupling '$minCoupling'!" }
+    }
 
     private val project = Project.empty()
     private val changes = hashMapOf<String, Int>()
@@ -101,95 +104,38 @@ class HistoryVisitor private constructor(options: Options) {
     private fun takeNode(node: Graph.Node): Boolean =
         node.revisions >= minRevisions
 
-    private fun takeEdge(edge: Graph.Edge): Boolean {
-        val (_, _, revisions, coupling) = edge
-        return revisions >= minRevisions && coupling >= minCoupling
+    private fun takeEdge(edge: Graph.Edge): Boolean =
+        edge.revisions >= minRevisions && edge.coupling >= minCoupling
+
+    private fun makeEdge(id1: String, id2: String, revisions: Int): Graph.Edge {
+        val countId1 = changes.getValue(id1)
+        val countId2 = changes.getValue(id2)
+        val totalCount = countId1 + countId2 - revisions
+        val coupling = 1.0 * revisions / totalCount
+        return Edge(id1, id2, revisions, coupling)
     }
 
-    private fun aggregateGraphs(): HashMap<String, Graph> {
-        val graphs = hashMapOf<String, Graph>()
-        val idsByFile = changes.keys
-            .groupBy(::getSourcePath)
-            .mapValues { (_, ids) -> ids.toSet() }
-
-        for ((path, ids) in idsByFile) {
+    private fun aggregate(): List<Graph> {
+        val idsByFile = changes.keys.groupBy(::getSourcePath)
+        return idsByFile.map { (path, ids) ->
             val edges = ids.flatMap { id1 ->
                 jointChanges[id1].orEmpty()
                     .filter { (id2, _) -> id1 < id2 }
-                    .map { (id2, revisions) ->
-                        val countId1 = changes.getValue(id1)
-                        val countId2 = changes.getValue(id2)
-                        val totalCount = countId1 + countId2 - revisions
-                        val coupling = 1.0 * revisions / totalCount
-                        Edge(id1, id2, revisions, coupling)
-                    }
-            }.filter(::takeEdge)
-
-            val nodes =
-                (ids + edges.flatMap { (id1, id2, _, _) -> listOf(id1, id2) })
-                    .map { id -> Node(id, changes.getValue(id)) }
-                    .filter(::takeNode)
-                    .toSet()
-
-            graphs[path] = Graph(path, nodes, edges)
-        }
-        return graphs
-    }
-
-    private fun aggregate(
-        graphs: HashMap<String, Graph>,
-        unit: SourceUnit
-    ): FileReport {
-        val graph = graphs[unit.id]
-        val blobs = graph?.findBlobs(minBlobDensity).orEmpty()
-        val antiBlob = graph?.findAntiBlob(maxAntiCoupling, minAntiBlobSize)
-        if (graph != null) {
-            graphs[unit.id] = graph.colorNodes(blobs, antiBlob)
-        }
-        return FileReport(unit.path, blobs, antiBlob)
-    }
-
-    private fun aggregate(): Report {
-        val graphs = aggregateGraphs()
-        val files = project.sources
-            .map { aggregate(graphs, it) }
-            .sortedByDescending(FileReport::value)
-        return Report(files, graphs.values.toList())
-    }
-
-    data class Options(
-        val maxChangeSet: Int,
-        val minCoupling: Double,
-        val minRevisions: Int,
-        val minBlobDensity: Double,
-        val maxAntiCoupling: Double,
-        val minAntiBlobSize: Int
-    ) {
-
-        init {
-            require(maxChangeSet > 0) { "Invalid change set '$maxChangeSet'!" }
-            require(minCoupling >= 0.0) { "Invalid coupling '$minCoupling'!" }
-            require(minRevisions > 0) { "Invalid revisions '$minRevisions'!" }
-            require(minBlobDensity >= 0.0) {
-                "Invalid blob density '$minBlobDensity'!"
+                    .map { (id2, revisions) -> makeEdge(id1, id2, revisions) }
             }
-            require(maxAntiCoupling >= 0.0) {
-                "Invalid coupling '$maxAntiCoupling'!"
-            }
-            require(minAntiBlobSize > 0) {
-                "Invalid anti blob size '$minAntiBlobSize'!"
-            }
+            val nodes = (ids + edges.getEndpoints())
+                .map { id -> Node(id, changes.getValue(id)) }
+                .toSet()
+            Graph(path, nodes, edges)
+                .filterNodes(::takeNode)
+                .filterEdges(::takeEdge)
         }
     }
 
-    companion object {
-        fun analyze(
-            history: Iterable<Transaction>,
-            options: Options
-        ): Report {
-            val visitor = HistoryVisitor(options)
-            history.forEach(visitor::analyze)
-            return visitor.aggregate()
-        }
+    fun analyze(history: Iterable<Transaction>): Report {
+        history.forEach(::analyze)
+        return Report(aggregate())
     }
+
+    data class Report(val graphs: List<Graph>)
 }

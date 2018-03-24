@@ -18,7 +18,6 @@ package org.metanalysis.srb
 
 import org.metanalysis.core.repository.PersistentRepository
 import org.metanalysis.core.serialization.JsonModule
-import org.metanalysis.srb.HistoryVisitor.Options
 import picocli.CommandLine
 import picocli.CommandLine.Command
 import picocli.CommandLine.ExecutionException
@@ -39,12 +38,12 @@ class Main : Runnable {
         names = ["--max-change-set"],
         description = ["the maximum number of changed files in a revision"]
     )
-    private var maxChangeSet: Int = 50
+    private var maxChangeSet: Int = 100
 
     @Option(
         names = ["--min-revisions"],
         description = [
-            "the minimum number of revisions of a method or relation"
+            "the minimum number of revisions of a method or coupling relation"
         ]
     )
     private var minRevisions: Int = 5
@@ -58,7 +57,7 @@ class Main : Runnable {
     @Option(
         names = ["--min-blob-density"],
         description = [
-            "the minimum average degree (sum of coupling) of a method in a blob"
+            "the minimum average degree (sum of coupling) of methods in a blob"
         ]
     )
     private var minBlobDensity: Double = 2.5
@@ -78,7 +77,7 @@ class Main : Runnable {
     private var minAntiBlobSize: Int = 10
 
     override fun run() {
-        val options = Options(
+        val analyzer = SingleResponsibilityBreakersAnalyzer(
             maxChangeSet = maxChangeSet,
             minRevisions = minRevisions,
             minCoupling = minCoupling,
@@ -88,23 +87,23 @@ class Main : Runnable {
         )
         val repository = PersistentRepository.load()
             ?: error("Repository not found!")
-        val report = HistoryVisitor.analyze(repository.getHistory(), options)
+        val report = analyzer.analyze(repository.getHistory())
         JsonModule.serialize(System.out, report.files)
-        for (graph in report.graphs) {
+        for (coloredGraph in report.coloredGraphs) {
             val directory = File(".metanalysis-srb")
-            val graphDirectory = File(directory, graph.label)
+            val graphDirectory = File(directory, coloredGraph.graph.label)
             graphDirectory.mkdirs()
             val graphFile = File(graphDirectory, "graph.json")
             graphFile.outputStream().use { out ->
-                JsonModule.serialize(out, graph)
+                JsonModule.serialize(out, coloredGraph)
             }
         }
     }
 }
 
 fun main(vararg args: String) {
+    val cmd = CommandLine(Main())
     try {
-        val cmd = CommandLine(Main())
         cmd.parseWithHandler(RunAll(), mutableListOf<Any?>(), args)
     } catch (e: ExecutionException) {
         System.err.println(e.message)
