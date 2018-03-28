@@ -5,8 +5,8 @@ buildscript {
     ext {
         kotlin_version = '1.2.31'
         junit_version = '4.12'
-        metanalysis_version = '0.2.5'
-        picocli_version = '3.0.0-alpha-1'
+        metanalysis_version = '0.2.6'
+        picocli_version = '3.0.0-alpha-2'
     }
 
     repositories {

@@ -19,7 +19,13 @@ In order to use `metanalysis-srb` you need to have `JDK 1.8` or newer.
 
 Download the most recently released distribution from
 [here](https://github.com/andreihh/metanalysis-srb/releases) and run the
-executable from the `bin` directory: `./metanalysis-srb`.
+executable from the `bin` directory: `./metanalysis-srb help`.
+
+In order to visualize the graph corresponding to one of the inspected source
+files, open the
+[index.html](https://github.com/andreihh/metanalysis-srb/blob/master/index.html)
+file with the `graph.json` file saved as `file.json` in the same directory as
+the `index.html` file.
 
 ## Licensing
 

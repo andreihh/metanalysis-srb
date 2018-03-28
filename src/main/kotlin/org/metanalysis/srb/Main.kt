@@ -23,6 +23,7 @@ import picocli.CommandLine.Command
 import picocli.CommandLine.ExecutionException
 import picocli.CommandLine.Option
 import picocli.CommandLine.RunAll
+import picocli.CommandLine.defaultExceptionHandler
 import java.io.File
 import kotlin.system.exitProcess
 
@@ -103,8 +104,9 @@ class Main : Runnable {
 
 fun main(vararg args: String) {
     val cmd = CommandLine(Main())
+    val exceptionHandler = defaultExceptionHandler().andExit(1)
     try {
-        cmd.parseWithHandler(RunAll(), mutableListOf<Any?>(), args)
+        cmd.parseWithHandlers(RunAll(), exceptionHandler , *args)
     } catch (e: ExecutionException) {
         System.err.println(e.message)
         e.printStackTrace(System.err)
